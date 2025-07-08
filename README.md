@@ -2,6 +2,8 @@
 
 Eine vollständige Webapplikation zur Verwaltung und Visualisierung von GPX-Touren.
 
+Das ganze Projekt ist kreiert von Github Copilot mit Claude Sonnet 3.5.
+
 ## 🏗️ Architektur
 
 ```
