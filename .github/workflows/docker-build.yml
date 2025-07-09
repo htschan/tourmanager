@@ -20,10 +20,25 @@ jobs:
       - name: Set up image names
         id: meta
         run: |
-          echo "backend_image=${REGISTRY}/${BACKEND_IMAGE}" >> $GITHUB_OUTPUT
-          echo "frontend_image=${REGISTRY}/${FRONTEND_IMAGE}" >> $GITHUB_OUTPUT
+          # Set repository prefix if available
+          if [ -n "$REPOSITORY" ]; then
+            # Ensure repository URL doesn't have trailing slash
+            REPOSITORY_URL=$(echo "$REPOSITORY" | sed 's#/$##')
+            REPOSITORY_PREFIX="$REPOSITORY_URL/"
+          else
+            REPOSITORY_PREFIX=""
+          fi
+          
+          # Generate full image names
+          echo "backend_image=${REPOSITORY_PREFIX}${BACKEND_IMAGE}" >> $GITHUB_OUTPUT
+          echo "frontend_image=${REPOSITORY_PREFIX}${FRONTEND_IMAGE}" >> $GITHUB_OUTPUT
+          
+          # Debug output
+          echo "Debug: Repository prefix: '${REPOSITORY_PREFIX}'"
+          echo "Debug: Generated backend image name: ${REPOSITORY_PREFIX}${BACKEND_IMAGE}"
+          echo "Debug: Generated frontend image name: ${REPOSITORY_PREFIX}${FRONTEND_IMAGE}"
         env:
-          REGISTRY: ${{ secrets.REGISTRY }}
+          REPOSITORY: ${{ secrets.REPOSITORY }}
           BACKEND_IMAGE: ${{ vars.BACKEND_IMAGE_NAME }}
           FRONTEND_IMAGE: ${{ vars.FRONTEND_IMAGE_NAME }}
 
@@ -32,9 +47,10 @@ jobs:
         id: metabackend
         uses: docker/metadata-action@v4
         with:
-          images: ${{ steps.meta.outputs.backend_image }}
+          images: ${{ format('{0}', steps.meta.outputs.backend_image) }}
+          flavor: |
+            latest=true
           tags: |
-            type=ref,event=branch
             type=sha,format=short
 
       - name: Build and Push Backend Image
@@ -51,9 +67,10 @@ jobs:
         id: metafrontend
         uses: docker/metadata-action@v4
         with:
-          images: ${{ steps.meta.outputs.frontend_image }}
+          images: ${{ format('{0}', steps.meta.outputs.frontend_image) }}
+          flavor: |
+            latest=true
           tags: |
-            type=ref,event=branch
             type=sha,format=short
 
       # Build and push Frontend image
@@ -71,8 +88,16 @@ jobs:
       - name: Test Stack
         run: |
           # Update image names in docker-compose.yml
-          sed -i "s|build: ./backend|image: ${{ steps.meta.outputs.backend_image }}|" docker-compose.yml
-          sed -i "s|build: ./frontend|image: ${{ steps.meta.outputs.frontend_image }}|" docker-compose.yml
+          backend_image="${{ steps.meta.outputs.backend_image }}"
+          frontend_image="${{ steps.meta.outputs.frontend_image }}"
+          
+          # Debug image names
+          echo "Using backend image: $backend_image"
+          echo "Using frontend image: $frontend_image"
+          
+          # Update docker-compose.yml
+          sed -i "s|build: ./backend|image: $backend_image|" docker-compose.yml
+          sed -i "s|build: ./frontend|image: $frontend_image|" docker-compose.yml
           
           docker compose up -d
           # Wait for services to be healthy
