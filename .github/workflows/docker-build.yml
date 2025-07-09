@@ -20,8 +20,13 @@ jobs:
       - name: Set up image names
         id: meta
         run: |
-          echo "backend_image=${REGISTRY}/${BACKEND_IMAGE}" >> $GITHUB_OUTPUT
-          echo "frontend_image=${REGISTRY}/${FRONTEND_IMAGE}" >> $GITHUB_OUTPUT
+          # Ensure registry URL doesn't have trailing slash
+          REGISTRY_URL=$(echo "$REGISTRY" | sed 's#/$##')
+          echo "backend_image=$REGISTRY_URL/$BACKEND_IMAGE" >> $GITHUB_OUTPUT
+          echo "frontend_image=$REGISTRY_URL/$FRONTEND_IMAGE" >> $GITHUB_OUTPUT
+          # Debug output
+          echo "Debug: Generated backend image name: $REGISTRY_URL/$BACKEND_IMAGE"
+          echo "Debug: Generated frontend image name: $REGISTRY_URL/$FRONTEND_IMAGE"
         env:
           REGISTRY: ${{ secrets.REGISTRY }}
           BACKEND_IMAGE: ${{ vars.BACKEND_IMAGE_NAME }}
@@ -32,9 +37,10 @@ jobs:
         id: metabackend
         uses: docker/metadata-action@v4
         with:
-          images: ${{ steps.meta.outputs.backend_image }}
+          images: ${{ format('{0}', steps.meta.outputs.backend_image) }}
+          flavor: |
+            latest=true
           tags: |
-            type=ref,event=branch
             type=sha,format=short
 
       - name: Build and Push Backend Image
@@ -51,9 +57,10 @@ jobs:
         id: metafrontend
         uses: docker/metadata-action@v4
         with:
-          images: ${{ steps.meta.outputs.frontend_image }}
+          images: ${{ format('{0}', steps.meta.outputs.frontend_image) }}
+          flavor: |
+            latest=true
           tags: |
-            type=ref,event=branch
             type=sha,format=short
 
       # Build and push Frontend image
