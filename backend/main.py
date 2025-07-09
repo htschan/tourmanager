@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # --- Konfiguration ---
-DATABASE_FILE = os.getenv('DATABASE_PATH', os.path.join(os.path.dirname(__file__), '..', 'scripts', 'touren.db'))
+DATABASE_FILE = os.getenv('DATABASE_PATH', os.path.join(os.path.dirname(__file__), 'scripts', 'touren.db'))
 print(f"DATABASE_FILE: {DATABASE_FILE}")
 engine = create_engine(f'sqlite:///{DATABASE_FILE}')
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
