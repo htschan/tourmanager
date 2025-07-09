@@ -57,7 +57,8 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ./backend
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, 'Merge') && github.ref == 'refs/heads/main' }}
+          load: true
           tags: ${{ steps.metabackend.outputs.tags }}
           labels: ${{ steps.metabackend.outputs.labels }}
           cache-from: type=gha
@@ -78,7 +79,8 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ./frontend
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, 'Merge') && github.ref == 'refs/heads/main' }}
+          load: true
           tags: ${{ steps.metafrontend.outputs.tags }}
           labels: ${{ steps.metafrontend.outputs.labels }}
           cache-from: type=gha
