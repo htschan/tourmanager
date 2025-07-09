@@ -1,8 +1,15 @@
 # Project Overview: Tour Manager
 
+[![Docker Build](https://github.com/USERNAME/REPO/actions/workflows/docker-build.yml/badge.svg)](https://github.com/USERNAME/REPO/actions/workflows/docker-build.yml)
+
 Eine vollständige Webapplikation zur Verwaltung und Visualisierung von GPX-Touren.
 
-Das ganze Projekt ist kreiert von Github Copilot mit Claude Sonnet 3.5.
+Das Projekt wurde kreiert durch Github Copilot mit dem Claude Sonnet 3.5 Model im Agent-Modus.
+
+## Komoot
+
+Der Download von GPX-Touren erfolgt von deinem Konto in komoot.de mit dem Tool https://github.com/timschneeb/KomootGPX.
+
 
 ## 🏗️ Architektur
 

@@ -1,6 +1,8 @@
 services:
   backend:
     build: ./backend
+    # Uncomment to use pre-built image from GitHub Container Registry
+    # image: ghcr.io/USERNAME/REPO/backend:latest
     ports:
       - "8000:8000"
     volumes:
@@ -16,6 +18,8 @@ services:
 
   frontend:
     build: ./frontend
+    # Uncomment to use pre-built image from GitHub Container Registry
+    # image: ghcr.io/USERNAME/REPO/frontend:latest
     ports:
       - "3001:3000"
     environment:
