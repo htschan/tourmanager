@@ -16,12 +16,23 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
+      # Set up metadata variables
+      - name: Set up image names
+        id: meta
+        run: |
+          echo "backend_image=${REGISTRY}/${BACKEND_IMAGE}" >> $GITHUB_OUTPUT
+          echo "frontend_image=${REGISTRY}/${FRONTEND_IMAGE}" >> $GITHUB_OUTPUT
+        env:
+          REGISTRY: ${{ secrets.REGISTRY }}
+          BACKEND_IMAGE: ${{ vars.BACKEND_IMAGE_NAME }}
+          FRONTEND_IMAGE: ${{ vars.FRONTEND_IMAGE_NAME }}
+
       # Extract metadata for versioning
       - name: Extract metadata for Backend Image
         id: metabackend
         uses: docker/metadata-action@v4
         with:
-          images: ${{ secrets.REGISTRY }}/${{ vars.BACKEND_IMAGE_NAME }}
+          images: ${{ steps.meta.outputs.backend_image }}
           tags: |
             type=ref,event=branch
             type=sha,format=short
@@ -40,7 +51,7 @@ jobs:
         id: metafrontend
         uses: docker/metadata-action@v4
         with:
-          images: ${{ secrets.REGISTRY }}/${{ vars.FRONTEND_IMAGE_NAME }}
+          images: ${{ steps.meta.outputs.frontend_image }}
           tags: |
             type=ref,event=branch
             type=sha,format=short
@@ -58,14 +69,10 @@ jobs:
 
       # Test the stack
       - name: Test Stack
-        env:
-          REGISTRY: ${{ secrets.REGISTRY }}
-          BACKEND_IMAGE: ${{ vars.BACKEND_IMAGE_NAME }}
-          FRONTEND_IMAGE: ${{ vars.FRONTEND_IMAGE_NAME }}
         run: |
           # Update image names in docker-compose.yml
-          sed -i "s|build: ./backend|image: $REGISTRY/$BACKEND_IMAGE|" docker-compose.yml
-          sed -i "s|build: ./frontend|image: $REGISTRY/$FRONTEND_IMAGE|" docker-compose.yml
+          sed -i "s|build: ./backend|image: ${{ steps.meta.outputs.backend_image }}|" docker-compose.yml
+          sed -i "s|build: ./frontend|image: ${{ steps.meta.outputs.frontend_image }}|" docker-compose.yml
           
           docker compose up -d
           # Wait for services to be healthy
