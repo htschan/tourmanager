@@ -17,6 +17,9 @@
           <router-link to="/statistics" class="nav-link" @click="closeMenu">
             📊 Statistiken
           </router-link>
+          <button class="theme-toggle nav-link" @click="themeStore.toggleTheme">
+            {{ themeStore.theme === 'dark' ? '☀️' : '🌙' }}
+          </button>
         </div>
         
         <div class="nav-toggle" @click="toggleMenu">
@@ -51,8 +54,10 @@
 <script setup>
 import { ref } from 'vue'
 import { useToastStore } from './stores/toast'
+import { useThemeStore } from './stores/theme'
 
 const toastStore = useToastStore()
+const themeStore = useThemeStore()
 const isMenuOpen = ref(false)
 
 const toggleMenu = () => {
@@ -71,22 +76,46 @@ const closeMenu = () => {
   box-sizing: border-box;
 }
 
+:root {
+  /* Light theme */
+  --bg-color: #f8f9fa;
+  --text-color: #333;
+  --nav-bg: #3498db;
+  --nav-text: white;
+  --card-bg: white;
+  --border-color: #dee2e6;
+  --hover-bg: #e9ecef;
+}
+
+:root[data-theme="dark"] {
+  /* Dark theme */
+  --bg-color: #1a1a1a;
+  --text-color: #e0e0e0;
+  --nav-bg: #2c3e50;
+  --nav-text: #e0e0e0;
+  --card-bg: #2d2d2d;
+  --border-color: #404040;
+  --hover-bg: #363636;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.6;
-  color: #333;
-  background-color: #f8f9fa;
+  color: var(--text-color);
+  background-color: var(--bg-color);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Navigation */
 .navbar {
-  background: #3498db;
-  color: white;
+  background: var(--nav-bg);
+  color: var(--nav-text);
   padding: 0;
   position: sticky;
   top: 0;
   z-index: 1000;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: background-color 0.3s ease;
 }
 
 .nav-container {
