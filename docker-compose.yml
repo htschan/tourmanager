@@ -7,8 +7,11 @@ services:
       - "8000:8000"
     volumes:
       - ./scripts:/app/scripts:ro
+    env_file:
+      - ./backend/.env
+    # For local development, you can override the JWT secret here
     environment:
-      - DATABASE_PATH=/app/scripts/touren.db
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-local-development-key}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
