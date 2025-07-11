@@ -1,15 +1,25 @@
 from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import create_engine, text, func
 from sqlalchemy.orm import sessionmaker
 from typing import List, Optional, Dict, Any
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pydantic import BaseModel
 import json
 import math
 import os
 import logging
+from auth import (
+    Token,
+    User,
+    authenticate_user,
+    create_access_token,
+    get_current_active_user,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    fake_users_db
+)
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -513,6 +523,31 @@ async def debug_tour(tour_id: int):
                 return {"error": "Tour not found"}
     except Exception as e:
         return {"error": str(e)}
+
+@app.post("/token", response_model=Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(fake_users_db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.get("/users/me", response_model=User)
+async def read_users_me(current_user: User = Depends(get_current_active_user)):
+    return current_user
+
+# Protect your existing endpoints with authentication
+# Example:
+# @app.get("/protected-route")
+# async def protected_route(current_user: User = Depends(get_current_active_user)):
+#     return {"message": "This is a protected route"}
 
 if __name__ == "__main__":
     import uvicorn

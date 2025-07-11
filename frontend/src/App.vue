@@ -1,22 +1,32 @@
 <template>
   <div id="app">
     <!-- Navigation -->
-    <nav class="navbar">
+    <nav class="navbar" v-if="$route.meta.requiresAuth !== false">
       <div class="nav-container">
         <router-link to="/" class="nav-logo">
           🚴 Tour Manager
         </router-link>
         
         <div class="nav-menu" :class="{ active: isMenuOpen }">
-          <router-link to="/" class="nav-link" @click="closeMenu">
-            🏠 Home
-          </router-link>
-          <router-link to="/map" class="nav-link" @click="closeMenu">
-            🗺️ Karte
-          </router-link>
-          <router-link to="/statistics" class="nav-link" @click="closeMenu">
-            📊 Statistiken
-          </router-link>
+          <template v-if="authStore.isAuthenticated">
+            <router-link to="/" class="nav-link" @click="closeMenu">
+              🏠 Home
+            </router-link>
+            <router-link to="/map" class="nav-link" @click="closeMenu">
+              🗺️ Karte
+            </router-link>
+            <router-link to="/statistics" class="nav-link" @click="closeMenu">
+              📊 Statistiken
+            </router-link>
+            <button class="nav-link" @click="handleLogout">
+              🚪 Logout
+            </button>
+          </template>
+          <template v-else>
+            <router-link to="/login" class="nav-link" @click="closeMenu">
+              🔑 Login
+            </router-link>
+          </template>
           <button class="theme-toggle nav-link" @click="themeStore.toggleTheme">
             {{ themeStore.theme === 'dark' ? '☀️' : '🌙' }}
           </button>
@@ -52,13 +62,23 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useToastStore } from './stores/toast'
 import { useThemeStore } from './stores/theme'
+import { useAuthStore } from './stores/auth'
 
+const router = useRouter()
 const toastStore = useToastStore()
 const themeStore = useThemeStore()
+const authStore = useAuthStore()
 const isMenuOpen = ref(false)
+
+onMounted(() => {
+  if (authStore.token) {
+    authStore.fetchUser()
+  }
+})
 
 const toggleMenu = () => {
   isMenuOpen.value = !isMenuOpen.value
@@ -66,6 +86,12 @@ const toggleMenu = () => {
 
 const closeMenu = () => {
   isMenuOpen.value = false
+}
+
+const handleLogout = async () => {
+  authStore.logout()
+  await router.push('/login')
+  closeMenu()
 }
 </script>
 
