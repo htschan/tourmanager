@@ -114,23 +114,36 @@ input {
 
 button {
   width: 100%;
-  padding: 0.75rem;
-  background-color: #4CAF50;
+  padding: 1rem;
+  background-color: #3498db;
   color: white;
   border: none;
-  border-radius: 4px;
-  font-size: 1rem;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  letter-spacing: 0.5px;
 }
 
 button:hover {
-  background-color: #45a049;
+  background-color: #2980b9;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 button:disabled {
-  background-color: #cccccc;
+  background-color: #95a5a6;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+  opacity: 0.8;
 }
 
 .error-message {
