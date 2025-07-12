@@ -1,0 +1,19 @@
+services:
+  tourm-backend:
+    image: hub.bansom.synology.me/tourmbackend:latest
+    restart: on-failure:5
+    ports:
+      - 8000:8000
+    volumes:
+      - /volume1/docker/tourmbackend:/app/scripts:ro
+
+  tourm-frontend:
+    image: hub.bansom.synology.me/tourmui:latest
+    restart: unless-stopped
+    ports:
+      - 3001:3000
+    environment:
+      - VITE_API_BASE_URL=https://rmbackend.bansom.synology.me
+    depends_on:
+      - tourm-backend
+
