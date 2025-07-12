@@ -134,7 +134,9 @@ jobs:
           # Run frontend tests
           echo "Running frontend tests..."
           cd frontend
+          # First install to update package-lock.json with new dependencies
           npm install
+          # Then run tests
           npm test
           cd ..
           
