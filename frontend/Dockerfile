@@ -1,10 +1,14 @@
 FROM node:18-alpine
 
-# Build argument for API URL
+# Build arguments
 ARG VITE_API_BASE_URL=http://localhost:8000
+ARG VITE_BUILD_TIMESTAMP
+ARG VITE_GIT_SHA
 
-# Environment variable for runtime
+# Environment variables for runtime
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_BUILD_TIMESTAMP=$VITE_BUILD_TIMESTAMP
+ENV VITE_GIT_SHA=$VITE_GIT_SHA
 
 WORKDIR /app
 
