@@ -118,6 +118,10 @@ jobs:
           # Start containers
           docker compose up -d
           
+          # Show logs for debugging
+          echo "Backend container logs:"
+          docker compose logs backend
+          
           # Wait for services to be healthy
           echo "Waiting for backend to be ready..."
           timeout 30 bash -c 'until curl -s http://localhost:8000/ > /dev/null; do sleep 1; done'
