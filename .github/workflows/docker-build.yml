@@ -89,8 +89,8 @@ jobs:
           labels: ${{ steps.metafrontend.outputs.labels }}
           build-args: |
             VITE_API_BASE_URL=${{ env.API_BASE_URL }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            VITE_BUILD_TIMESTAMP=${{ github.event.repository.updated_at || github.event.head_commit.timestamp }}
+            VITE_GIT_SHA=${{ github.sha }}
 
       # Test the stack
       - name: Test Stack

@@ -23,6 +23,20 @@
 
     <!-- Statistics Content -->
     <div v-else-if="summary" class="stats-content">
+      <!-- Build Information -->
+      <div class="build-info-section">
+        <div class="build-info-grid">
+          <div class="build-info-card">
+            <div class="build-info-label">Build Timestamp:</div>
+            <div class="build-info-value">{{ formatBuildDate(buildTimestamp) }}</div>
+          </div>
+          <div class="build-info-card">
+            <div class="build-info-label">Git SHA:</div>
+            <div class="build-info-value">{{ gitSha.substring(0, 7) }}</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Overview Cards -->
       <div class="overview-section">
         <h2>📈 Übersicht</h2>
@@ -204,6 +218,8 @@ const tourStore = useTourStore()
 const toastStore = useToastStore()
 
 const records = ref(null)
+const buildTimestamp = import.meta.env.VITE_BUILD_TIMESTAMP || 'development'
+const gitSha = import.meta.env.VITE_GIT_SHA || 'development'
 
 // Computed
 const { summary, loading, error } = tourStore
@@ -300,6 +316,15 @@ const formatDate = (dateString) => {
   }
 }
 
+const formatBuildDate = (dateString) => {
+  if (dateString === 'development') return 'Development Build'
+  try {
+    return format(new Date(dateString), 'dd.MM.yyyy HH:mm', { locale: de })
+  } catch {
+    return dateString
+  }
+}
+
 // Lifecycle
 onMounted(() => {
   refreshStats()
@@ -310,6 +335,37 @@ onMounted(() => {
 .statistics {
   max-width: 1200px;
   margin: 0 auto;
+}
+
+.build-info-section {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 2rem;
+  border: 1px solid #e9ecef;
+}
+
+.build-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.build-info-card {
+  padding: 0.5rem;
+}
+
+.build-info-label {
+  font-size: 0.9rem;
+  color: #6c757d;
+  margin-bottom: 0.25rem;
+}
+
+.build-info-value {
+  font-family: monospace;
+  font-size: 1rem;
+  color: #2c3e50;
+  font-weight: 500;
 }
 
 .stats-header {
