@@ -95,6 +95,14 @@ jobs:
       # Test the stack
       - name: Test Stack
         run: |
+          # Create backend .env file with test configuration
+          mkdir -p backend
+          cat > backend/.env << EOL
+          JWT_SECRET_KEY=test-secret-key-for-ci
+          DATABASE_PATH=/app/scripts/touren.db
+          PORT=8000
+          EOL
+          
           # Update image names in docker-compose.yml
           backend_image="${{ steps.meta.outputs.backend_image }}"
           frontend_image="${{ steps.meta.outputs.frontend_image }}"
@@ -107,9 +115,17 @@ jobs:
           sed -i "s|build: ./backend|image: $backend_image|" docker-compose.yml
           sed -i "s|build: ./frontend|image: $frontend_image|" docker-compose.yml
           
+          # Start containers
           docker compose up -d
+          
           # Wait for services to be healthy
+          echo "Waiting for backend to be ready..."
           timeout 30 bash -c 'until curl -s http://localhost:8000/ > /dev/null; do sleep 1; done'
+          echo "Backend is ready"
+          
+          echo "Waiting for frontend to be ready..."
           timeout 30 bash -c 'until curl -s http://localhost:3001/ > /dev/null; do sleep 1; done'
+          echo "Frontend is ready"
+          
           # Run any additional tests here
           docker compose down
