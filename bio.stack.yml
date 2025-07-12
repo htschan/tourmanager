@@ -13,7 +13,7 @@ services:
     ports:
       - 3001:3000
     environment:
-      - VITE_API_BASE_URL=https://rmbackend.bansom.synology.me
+      - VITE_API_BASE_URL=https://the-backend.com
     depends_on:
       - tourm-backend
 
