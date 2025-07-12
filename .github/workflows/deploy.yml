@@ -32,7 +32,10 @@ jobs:
     - name: Install frontend dependencies
       working-directory: ./frontend
       run: |
-        npm ci
+        # First install to update package-lock.json with new dependencies
+        npm install
+        # Then install all dependencies from the updated lock file
+        npm install
 
     - name: Run backend tests
       working-directory: ./backend
