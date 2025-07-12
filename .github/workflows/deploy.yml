@@ -23,21 +23,11 @@ jobs:
       with:
         node-version: '18'
 
-    - name: Create test environment files
-      run: |
-        # Create backend test environment
-        echo "DATABASE_PATH=/app/scripts/touren.db" > backend/.env
-        echo "JWT_SECRET_KEY=test-secret-key-for-ci" >> backend/.env
-        echo "PORT=8000" >> backend/.env
-        
-        # Create frontend test environment
-        echo "VITE_API_BASE_URL=http://localhost:8000" > frontend/.env
-
     - name: Install backend dependencies
       working-directory: ./backend
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r requirements.txt pytest pytest-env
 
     - name: Install frontend dependencies
       working-directory: ./frontend
@@ -49,8 +39,12 @@ jobs:
       env:
         JWT_SECRET_KEY: test-secret-key-for-ci
         DATABASE_PATH: /app/scripts/touren.db
+        PORT: "8000"
       run: |
-        python -m pytest
+        # Create test data directory if needed
+        mkdir -p scripts
+        touch scripts/touren.db
+        python -m pytest -v
 
     - name: Run frontend tests
       working-directory: ./frontend
@@ -75,11 +69,18 @@ jobs:
         username: ${{ secrets.REGISTRY_USERNAME }}
         password: ${{ secrets.REGISTRY_PASSWORD }}
 
-    - name: Create .env file
+    - name: Setup build environment
       run: |
-        echo "DATABASE_PATH=/app/scripts/touren.db" > backend/.env
-        echo "JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}" >> backend/.env
-        echo "PORT=8000" >> backend/.env
+        # Create necessary directories
+        mkdir -p backend/scripts
+        touch backend/scripts/touren.db
+        
+        # Create environment file for build
+        cat > backend/.env << EOL
+        DATABASE_PATH=/app/scripts/touren.db
+        JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
+        PORT=8000
+        EOL
 
     - name: Build and push Backend
       uses: docker/build-push-action@v4

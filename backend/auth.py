@@ -6,11 +6,13 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
 
-# to generate a secure random secret key:
-# python -c "import secrets; print(secrets.token_urlsafe(32))"
-SECRET_KEY = "your-secret-key-here"  # Change this in production!
+# Environment variables for authentication
+import os
+
+# JWT configuration
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secure-secret-key-here")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
