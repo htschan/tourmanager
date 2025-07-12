@@ -34,10 +34,10 @@ tour-manager/
 ### Mit Docker (Empfohlen)
 ```bash
 # Alle Services starten
-docker-compose up --build
+docker compose up --build
 
 # Backend: http://localhost:8000
-# Frontend: http://localhost:3000
+# Frontend: http://localhost:3001
 ```
 
 ### Manuell
@@ -71,6 +71,9 @@ npm run dev
 - 🔍 **Live-Filter** und Suche
 - 📊 **Detaillierte Tour-Statistiken**
 - ⚡ **Vite** für schnelle Entwicklung
+- 🔐 **Authentifizierung** mit JWT
+- 🌓 **Dark/Light Mode** Support
+- 🏗️ **Build Info** (Timestamp & Git SHA)
 
 ### GPX Import System
 - 📥 **Batch-Import** aller GPX-Dateien
@@ -141,10 +144,14 @@ Die Frontend-App kann als PWA auf jedem Gerät installiert werden:
 ### Environment Variables
 ```bash
 # Backend
+JWT_SECRET_KEY=your-secret-key
 DATABASE_PATH=/path/to/touren.db
+PORT=8000
 
 # Frontend  
 VITE_API_BASE_URL=http://localhost:8000
+VITE_BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
+VITE_GIT_SHA=${GIT_SHA}
 ```
 
 ### Docker Compose Override
@@ -152,22 +159,28 @@ VITE_API_BASE_URL=http://localhost:8000
 # docker-compose.override.yml
 version: '3.8'
 services:
-  backend:
+  tourm-backend:
     environment:
-      - DEBUG=true
-  frontend:
+      - JWT_SECRET_KEY=your-secret-key
+      - DATABASE_PATH=/app/scripts/touren.db
+      - PORT=8000
+  tourm-frontend:
     environment:
       - VITE_API_BASE_URL=http://localhost:8000
+      - VITE_BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
+      - VITE_GIT_SHA=${GIT_SHA}
 ```
 
 ## 📋 Roadmap
 
-- [ ] **Benutzer-Authentifizierung**
+- [x] **Benutzer-Authentifizierung**
 - [ ] **Tour-Upload Interface** 
 - [ ] **Social Features** (Teilen, Bewertungen)
-- [ ] **Erweiterte Statistiken** (Heatmaps, Trends)
-- [ ] **Offline-Modus** für Tour-Details
+- [x] **Erweiterte Statistiken** (Build Info, Deploy Info)
+- [x] **Dark/Light Mode**
 - [ ] **Export-Funktionen** (GPX, PDF Reports)
+- [ ] **CI/CD Pipeline Verbesserungen**
+- [ ] **Test Coverage Erhöhung**
 
 ## 🤝 Contributing
 
