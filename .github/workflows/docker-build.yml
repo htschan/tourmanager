@@ -131,5 +131,12 @@ jobs:
           timeout 30 bash -c 'until curl -s http://localhost:3001/ > /dev/null; do sleep 1; done'
           echo "Frontend is ready"
           
-          # Run any additional tests here
+          # Run frontend tests
+          echo "Running frontend tests..."
+          cd frontend
+          npm install
+          npm test
+          cd ..
+          
+          # Cleanup
           docker compose down
