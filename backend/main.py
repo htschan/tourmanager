@@ -1,9 +1,9 @@
-from fastapi import FastAPI, HTTPException, Query, Depends
+from fastapi import FastAPI, HTTPException, Query, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import create_engine, text, func
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date, timedelta
 from pydantic import BaseModel
@@ -11,15 +11,20 @@ import json
 import math
 import os
 import logging
+from database import SessionLocal, engine, get_db  # Import database utilities
 from auth import (
-    Token,
-    User,
-    authenticate_user,
     create_access_token,
     get_current_active_user,
-    ACCESS_TOKEN_EXPIRE_MINUTES,
-    fake_users_db
+    authenticate_user,
+    ACCESS_TOKEN_EXPIRE_MINUTES
 )
+from models.users import User as UserModel
+from schemas.users import User as UserSchema
+from schemas.users import UserCreate, UserInDB, UserBase
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -547,8 +552,11 @@ async def debug_tour(tour_id: int):
         return {"error": str(e)}
 
 @app.post("/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(fake_users_db, form_data.username, form_data.password)
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
             status_code=401,
@@ -559,10 +567,15 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     access_token = create_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires
     )
+    
+    # Update last login time
+    user.last_login = datetime.utcnow()
+    db.commit()
+    
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.get("/users/me", response_model=User)
-async def read_users_me(current_user: User = Depends(get_current_active_user)):
+@app.get("/users/me", response_model=UserSchema)
+async def read_users_me(current_user: UserModel = Depends(get_current_active_user)):
     return current_user
 
 # Protect your existing endpoints with authentication

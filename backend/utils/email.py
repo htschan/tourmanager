@@ -6,18 +6,28 @@ from datetime import datetime, timedelta
 from auth import SECRET_KEY, ALGORITHM
 
 # Email configuration
-conf = ConnectionConfig(
-    MAIL_USERNAME=os.getenv("MAIL_USERNAME", ""),
-    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD", ""),
-    MAIL_FROM=os.getenv("MAIL_FROM", "noreply@yourdomain.com"),
-    MAIL_PORT=int(os.getenv("MAIL_PORT", "587")),
-    MAIL_SERVER=os.getenv("MAIL_SERVER", "smtp.gmail.com"),
-    MAIL_TLS=True,
-    MAIL_SSL=False,
-    USE_CREDENTIALS=True
-)
+def get_mail_config() -> ConnectionConfig:
+    required_settings = ["MAIL_USERNAME", "MAIL_PASSWORD", "MAIL_FROM"]
+    missing_settings = [setting for setting in required_settings if not os.getenv(setting)]
+    
+    if missing_settings:
+        print(f"Warning: Missing required email settings: {', '.join(missing_settings)}")
+        print("Email functionality will be disabled")
+        return None
+    
+    return ConnectionConfig(
+        MAIL_USERNAME=os.getenv("MAIL_USERNAME"),
+        MAIL_PASSWORD=os.getenv("MAIL_PASSWORD"),
+        MAIL_FROM=os.getenv("MAIL_FROM"),
+        MAIL_PORT=int(os.getenv("MAIL_PORT", "587")),
+        MAIL_SERVER=os.getenv("MAIL_SERVER", "smtp.gmail.com"),
+        MAIL_TLS=True,
+        MAIL_SSL=False,
+        USE_CREDENTIALS=True
+    )
 
-fastmail = FastMail(conf)
+conf = get_mail_config()
+fastmail = FastMail(conf) if conf else None
 
 def create_verification_token(email: str) -> str:
     expire = datetime.utcnow() + timedelta(hours=24)
@@ -43,6 +53,10 @@ def verify_token(token: str) -> str:
         return None
 
 async def send_verification_email(email: str, token: str):
+    if not fastmail:
+        print(f"Email not configured. Verification URL for {email}: {os.getenv('FRONTEND_URL', 'http://localhost:3000')}/verify-email?token={token}")
+        return
+        
     verify_url = f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/verify-email?token={token}"
     
     message = MessageSchema(
@@ -61,9 +75,18 @@ async def send_verification_email(email: str, token: str):
         subtype="html"
     )
     
-    await fastmail.send_message(message)
+    try:
+        await fastmail.send_message(message)
+    except Exception as e:
+        print(f"Failed to send verification email to {email}: {str(e)}")
+        # In development, print the verification URL to console
+        print(f"Verification URL: {verify_url}")
 
 async def send_password_reset_email(email: str, token: str):
+    if not fastmail:
+        print(f"Email not configured. Password reset URL for {email}: {os.getenv('FRONTEND_URL', 'http://localhost:3000')}/reset-password?token={token}")
+        return
+        
     reset_url = f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/reset-password?token={token}"
     
     message = MessageSchema(
