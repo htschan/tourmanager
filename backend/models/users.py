@@ -1,0 +1,48 @@
+from sqlalchemy import Boolean, Column, String, DateTime, Enum
+from sqlalchemy.ext.declarative import declarative_base
+import enum
+from datetime import datetime
+
+Base = declarative_base()
+
+class UserRole(enum.Enum):
+    ADMIN = "admin"
+    USER = "user"
+
+class UserStatus(enum.Enum):
+    PENDING = "pending"
+    ACTIVE = "active"
+    DISABLED = "disabled"
+
+class User(Base):
+    __tablename__ = "users"
+
+    username = Column(String, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+    role = Column(Enum(UserRole), default=UserRole.USER)
+    status = Column(Enum(UserStatus), default=UserStatus.PENDING)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_login = Column(DateTime, nullable=True)
+    email_verified = Column(Boolean, default=False)
+    verification_token = Column(String, nullable=True)
+    reset_token = Column(String, nullable=True)
+    reset_token_expires = Column(DateTime, nullable=True)
+    # Profile fields
+    full_name = Column(String, nullable=True)
+    bio = Column(String, nullable=True)
+    preferences = Column(JSON, nullable=True)
+    avatar_url = Column(String, nullable=True)
+
+    # Relationships
+    activities = relationship("UserActivity", back_populates="user")
+
+    def to_dict(self):
+        return {
+            "username": self.username,
+            "email": self.email,
+            "role": self.role.value,
+            "status": self.status.value,
+            "created_at": self.created_at.isoformat(),
+            "last_login": self.last_login.isoformat() if self.last_login else None
+        }

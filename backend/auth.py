@@ -4,7 +4,9 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
+from sqlalchemy.orm import Session
+from models.users import User, UserRole, UserStatus
 
 # Environment variables for authentication
 import os
@@ -42,21 +44,78 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: Optional[str] = None
 
-class User(BaseModel):
+class UserCreate(BaseModel):
     username: str
-    disabled: Optional[bool] = None
+    email: EmailStr
+    password: str
 
-class UserInDB(User):
-    hashed_password: str
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
+    status: Optional[str] = None
 
-# This is a mock user database. In production, use a real database
-fake_users_db = {
-    "admin": {
-        "username": "admin",
-        "hashed_password": pwd_context.hash("admin"),  # Change this in production!
-        "disabled": False,
-    }
-}
+class UserResponse(BaseModel):
+    username: str
+    email: EmailStr
+    role: str
+    status: str
+    created_at: datetime
+    last_login: Optional[datetime] = None
+
+def get_db():
+    from database import SessionLocal
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def get_user(db: Session, username: str):
+    return db.query(User).filter(User.username == username).first()
+
+def get_user_by_email(db: Session, email: str):
+    return db.query(User).filter(User.email == email).first()
+
+def get_users(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(User).offset(skip).limit(limit).all()
+
+def create_user(db: Session, user: UserCreate):
+    hashed_password = pwd_context.hash(user.password)
+    db_user = User(
+        username=user.username,
+        email=user.email,
+        hashed_password=hashed_password,
+        role=UserRole.USER,
+        status=UserStatus.PENDING
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+def update_user_status(db: Session, username: str, status: UserStatus):
+    db_user = get_user(db, username)
+    if db_user:
+        db_user.status = status
+        db.commit()
+        db.refresh(db_user)
+    return db_user
+
+# Create initial admin user if not exists
+def create_initial_admin(db: Session):
+    admin = get_user(db, "admin")
+    if not admin:
+        admin = User(
+            username="admin",
+            email="admin@example.com",
+            hashed_password=pwd_context.hash("admin"),
+            role=UserRole.ADMIN,
+            status=UserStatus.ACTIVE
+        )
+        db.add(admin)
+        db.commit()
+        db.refresh(admin)
+        logger.info("Created initial admin user")
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
@@ -66,12 +125,17 @@ def get_user(db, username: str):
         user_dict = db[username]
         return UserInDB(**user_dict)
 
-def authenticate_user(fake_db, username: str, password: str):
-    user = get_user(fake_db, username)
+def authenticate_user(db: Session, username: str, password: str):
+    user = get_user(db, username)
     if not user:
         return False
     if not verify_password(password, user.hashed_password):
         return False
+    if user.status != UserStatus.ACTIVE:
+        return False
+    # Update last login time
+    user.last_login = datetime.utcnow()
+    db.commit()
     return user
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
