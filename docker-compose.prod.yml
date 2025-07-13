@@ -6,7 +6,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./data/scripts:/app/scripts:ro
+      - ./data/scripts:/app/scripts
     env_file:
       - .env
     restart: unless-stopped

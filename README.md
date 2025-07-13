@@ -62,6 +62,8 @@ npm run dev
 - 🔍 **Erweiterte Filter** (Typ, Datum, Distanz, Höhe)
 - 🗺️ **GeoJSON Export** für Kartendarstellung
 - 📈 **Statistiken** und Zusammenfassungen
+- 🔐 **Benutzerauthentifizierung** mit JWT und Admin-Benutzer
+- 🚀 **Automatische Initialisierung** der Datenbank und Admin-Account
 
 ### Frontend (Vue.js PWA)
 - 🗺️ **Interaktive Karten** mit OpenStreetMap/Leaflet
@@ -91,14 +93,32 @@ npm run dev
 - **Vollbild-Modus** für detaillierte Ansicht
 - **Touch-optimierte Bedienung** für Mobile
 
+## 🔐 Authentifizierung & Datenbank
+
+### Admin Benutzer
+- Ein Admin-Benutzer wird automatisch bei der ersten Ausführung erstellt
+- **Standardzugangsdaten:**
+  - Benutzername: `admin`
+  - Passwort: `admin`
+
+### Datenbank
+- SQLite Datenbank wird automatisch initialisiert
+- Unterstützt read/write Operationen in Docker-Umgebung
+- GPX-Touren werden automatisch importiert und kategorisiert
+
 ## 📊 API Endpoints
 
+### Tour-Management
 - `GET /api/tours` - Gefilterte Tour-Liste
 - `GET /api/tours/{id}` - Tour-Details mit Kartendaten
 - `POST /api/tours/nearby` - Standort-basierte Suche
 - `GET /api/tours/geojson` - GeoJSON für Karten
 - `GET /api/tours/summary` - Statistik-Dashboard
-- `GET /docs` - Swagger API Dokumentation
+
+### Authentifizierung
+- `POST /api/auth/login` - Benutzer Login
+- `POST /api/auth/refresh` - Token auffrischen
+- `GET /api/auth/me` - Aktuelle Benutzerinformationen
 
 ## 🛠️ Entwicklung
 

@@ -6,7 +6,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./scripts:/app/scripts:ro
+      - ./scripts:/app/scripts
     env_file:
       - ./backend/.env
     # For local development, you can override the JWT secret here
