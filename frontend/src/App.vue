@@ -18,7 +18,18 @@
             <router-link to="/statistics" class="nav-link" @click="closeMenu">
               📊 Statistiken
             </router-link>
-            <button class="nav-link" @click="handleLogout">
+            <router-link to="/profile" class="nav-link" @click="closeMenu">
+              👤 Profile
+            </router-link>
+            <router-link 
+              v-if="authStore.user?.role === 'ADMIN'" 
+              to="/admin" 
+              class="nav-link" 
+              @click="closeMenu"
+            >
+              👥 Users
+            </router-link>
+            <button class="nav-link logout-btn" @click="handleLogout">
               🚪 Logout
             </button>
           </template>
@@ -170,6 +181,22 @@ body {
   color: white;
   text-decoration: none;
   transition: opacity 0.3s;
+  border: none;
+  background: none;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+}
+
+.nav-link.logout-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.nav-link.logout-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  opacity: 1;
 }
 
 .nav-link:hover,

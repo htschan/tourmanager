@@ -1,0 +1,84 @@
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+import os
+from typing import List
+import jwt
+from datetime import datetime, timedelta
+from auth import SECRET_KEY, ALGORITHM
+
+# Email configuration
+conf = ConnectionConfig(
+    MAIL_USERNAME=os.getenv("MAIL_USERNAME", ""),
+    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD", ""),
+    MAIL_FROM=os.getenv("MAIL_FROM", "noreply@yourdomain.com"),
+    MAIL_PORT=int(os.getenv("MAIL_PORT", "587")),
+    MAIL_SERVER=os.getenv("MAIL_SERVER", "smtp.gmail.com"),
+    MAIL_TLS=True,
+    MAIL_SSL=False,
+    USE_CREDENTIALS=True
+)
+
+fastmail = FastMail(conf)
+
+def create_verification_token(email: str) -> str:
+    expire = datetime.utcnow() + timedelta(hours=24)
+    return jwt.encode(
+        {"exp": expire, "email": email},
+        SECRET_KEY,
+        algorithm=ALGORITHM
+    )
+
+def create_password_reset_token(email: str) -> str:
+    expire = datetime.utcnow() + timedelta(hours=1)
+    return jwt.encode(
+        {"exp": expire, "email": email, "type": "reset"},
+        SECRET_KEY,
+        algorithm=ALGORITHM
+    )
+
+def verify_token(token: str) -> str:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload.get("email")
+    except:
+        return None
+
+async def send_verification_email(email: str, token: str):
+    verify_url = f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/verify-email?token={token}"
+    
+    message = MessageSchema(
+        subject="Verify your email",
+        recipients=[email],
+        body=f"""
+        <html>
+            <body>
+                <h1>Verify your email address</h1>
+                <p>Click the link below to verify your email address:</p>
+                <p><a href="{verify_url}">Verify Email</a></p>
+                <p>This link will expire in 24 hours.</p>
+            </body>
+        </html>
+        """,
+        subtype="html"
+    )
+    
+    await fastmail.send_message(message)
+
+async def send_password_reset_email(email: str, token: str):
+    reset_url = f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/reset-password?token={token}"
+    
+    message = MessageSchema(
+        subject="Reset your password",
+        recipients=[email],
+        body=f"""
+        <html>
+            <body>
+                <h1>Reset your password</h1>
+                <p>Click the link below to reset your password:</p>
+                <p><a href="{reset_url}">Reset Password</a></p>
+                <p>This link will expire in 1 hour.</p>
+                <p>If you didn't request this, please ignore this email.</p>
+            </body>
+        </html>
+        """,
+        subtype="html"
+    )
