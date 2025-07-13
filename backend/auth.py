@@ -6,7 +6,8 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
-from models.users import User, UserRole, UserStatus
+from models.users import User as UserModel, UserRole, UserStatus
+from schemas.users import User, UserCreate, UserInDB, UserBase
 
 # Environment variables for authentication
 import os
@@ -70,18 +71,18 @@ def get_db():
     finally:
         db.close()
 
-def get_user(db: Session, username: str):
-    return db.query(User).filter(User.username == username).first()
+def get_user(db: Session, username: str) -> Optional[UserModel]:
+    return db.query(UserModel).filter(UserModel.username == username).first()
 
 def get_user_by_email(db: Session, email: str):
-    return db.query(User).filter(User.email == email).first()
+    return db.query(UserModel).filter(UserModel.email == email).first()
 
 def get_users(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(User).offset(skip).limit(limit).all()
+    return db.query(UserModel).offset(skip).limit(limit).all()
 
 def create_user(db: Session, user: UserCreate):
     hashed_password = pwd_context.hash(user.password)
-    db_user = User(
+    db_user = UserModel(
         username=user.username,
         email=user.email,
         hashed_password=hashed_password,
@@ -110,7 +111,9 @@ def create_initial_admin(db: Session):
             email="admin@example.com",
             hashed_password=pwd_context.hash("admin"),
             role=UserRole.ADMIN,
-            status=UserStatus.ACTIVE
+            status=UserStatus.ACTIVE,
+            email_verified=True,
+            created_at=datetime.utcnow()
         )
         db.add(admin)
         db.commit()
@@ -120,19 +123,14 @@ def create_initial_admin(db: Session):
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
-def get_user(db, username: str):
-    if username in db:
-        user_dict = db[username]
-        return UserInDB(**user_dict)
-
-def authenticate_user(db: Session, username: str, password: str):
+def authenticate_user(db: Session, username: str, password: str) -> Optional[UserModel]:
     user = get_user(db, username)
     if not user:
-        return False
+        return None
     if not verify_password(password, user.hashed_password):
-        return False
+        return None
     if user.status != UserStatus.ACTIVE:
-        return False
+        return None
     # Update last login time
     user.last_login = datetime.utcnow()
     db.commit()
@@ -148,7 +146,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> UserModel:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -162,12 +160,14 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         token_data = TokenData(username=username)
     except JWTError:
         raise credentials_exception
-    user = get_user(fake_users_db, username=token_data.username)
+        
+    user = db.query(UserModel).filter(UserModel.username == token_data.username).first()
     if user is None:
         raise credentials_exception
     return user
 
-async def get_current_active_user(current_user: User = Depends(get_current_user)):
-    if current_user.disabled:
+
+async def get_current_active_user(current_user: UserModel = Depends(get_current_user)) -> UserModel:
+    if current_user.status != UserStatus.ACTIVE:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
