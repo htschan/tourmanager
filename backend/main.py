@@ -25,6 +25,25 @@ from auth import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# FastAPI App initialisieren
+app = FastAPI(
+    title="Tour Manager API",
+    description="API für die Verwaltung und Visualisierung von GPX-Touren",
+    version="1.0.0",
+)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://tourm.bansom.synology.me",
+        "http://localhost:3000",  # for local development
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # --- Konfiguration ---
 DATABASE_FILE = os.getenv('DATABASE_PATH', os.path.join(os.path.dirname(__file__), 'scripts', 'touren.db'))
 print(f"DATABASE_FILE: {DATABASE_FILE}")
@@ -62,7 +81,10 @@ app = FastAPI(
 # CORS Middleware für Frontend-Zugriff
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In Produktion auf spezifische Domains beschränken
+    allow_origins=[
+        "https://tourm.bansom.synology.me",
+        "http://localhost:3000",  # für lokale Entwicklung
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
