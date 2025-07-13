@@ -9,8 +9,15 @@ from pydantic import BaseModel
 # Environment variables for authentication
 import os
 
+def get_jwt_secret_key():
+    secret_key_file = os.getenv("JWT_SECRET_KEY_FILE")
+    if secret_key_file and os.path.exists(secret_key_file):
+        with open(secret_key_file, 'r') as f:
+            return f.read().strip()
+    return os.getenv("JWT_SECRET_KEY", "your-secure-secret-key-here")
+
 # JWT configuration
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secure-secret-key-here")
+SECRET_KEY = get_jwt_secret_key()
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
