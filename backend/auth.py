@@ -8,13 +8,24 @@ from pydantic import BaseModel
 
 # Environment variables for authentication
 import os
+import logging
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def get_jwt_secret_key():
     secret_key_file = os.getenv("JWT_SECRET_KEY_FILE")
     if secret_key_file and os.path.exists(secret_key_file):
         with open(secret_key_file, 'r') as f:
-            return f.read().strip()
-    return os.getenv("JWT_SECRET_KEY", "your-secure-secret-key-here")
+            secret = f.read().strip()
+            logger.info(f"JWT secret loaded from file: {secret_key_file}")
+            logger.info(f"JWT secret preview: {secret[:4]}{'*' * 20}")
+            return secret
+    secret = os.getenv("JWT_SECRET_KEY", "your-secure-secret-key-here")
+    logger.info(f"JWT secret loaded from environment variable")
+    logger.info(f"JWT secret preview: {secret[:4]}{'*' * 20}")
+    return secret
 
 # JWT configuration
 SECRET_KEY = get_jwt_secret_key()

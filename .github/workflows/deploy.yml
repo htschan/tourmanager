@@ -103,4 +103,4 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         build-args: |
-          VITE_API_BASE_URL=https://rmbackend.bansom.synology.me
+          VITE_API_BASE_URL=https://tourmbackend.bansom.synology.me
