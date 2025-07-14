@@ -25,6 +25,7 @@ from auth import (
     get_user_by_email,
     create_user
 )
+from models.users import UserRole, UserStatus
 
 # Initialize the database and tables
 from database import Base
@@ -599,6 +600,57 @@ async def register_user(user: UserCreate, db: Session = Depends(get_db)):
     # Create new user
     user = create_user(db=db, user=user)
     return user
+
+@app.get("/api/users", response_model=List[UserResponse])
+async def list_users(
+    current_user: UserModel = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """List all users (admin only)"""
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to view user list"
+        )
+    return db.query(UserModel).all()
+
+@app.patch("/api/users/{username}/status")
+async def update_user_status(
+    username: str,
+    status: UserStatus,
+    current_user: UserModel = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Update a user's status (admin only)"""
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to update user status"
+        )
+    
+    user = db.query(UserModel).filter(UserModel.username == username).first()
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+    
+    user.status = status
+    db.commit()
+    return {"message": f"User status updated to {status.value}"}
+
+@app.get("/api/users/pending", response_model=List[UserResponse])
+async def list_pending_users(
+    current_user: UserModel = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """List all pending users (admin only)"""
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to view pending users"
+        )
+    return db.query(UserModel).filter(UserModel.status == UserStatus.PENDING).all()
 
 # Protect your existing endpoints with authentication
 # Example:

@@ -13,7 +13,7 @@ export const useUserStore = defineStore('users', {
     async fetchUsers() {
       this.loading = true
       try {
-        const response = await api.get('/users')
+        const response = await api.get('/api/users')
         this.users = response.data
       } catch (error) {
         this.error = error.message
@@ -41,7 +41,7 @@ export const useUserStore = defineStore('users', {
     async updateUserStatus(username, status) {
       this.loading = true
       try {
-        const response = await api.patch(`/users/${username}/status`, JSON.stringify(status))
+        const response = await api.patch(`/api/users/${username}/status`, JSON.stringify(status))
         const updatedUser = response.data
         const index = this.users.findIndex(u => u.username === username)
         if (index !== -1) {

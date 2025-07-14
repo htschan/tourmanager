@@ -22,7 +22,7 @@
               👤 Profile
             </router-link>
             <router-link 
-              v-if="authStore.user?.role === 'ADMIN'" 
+              v-if="authStore.user?.role === 'admin'" 
               to="/admin" 
               class="nav-link" 
               @click="closeMenu"
