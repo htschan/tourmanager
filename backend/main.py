@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query, Depends, Request
+from fastapi import FastAPI, HTTPException, Query, Depends, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -129,6 +129,9 @@ class LocationFilter(BaseModel):
     latitude: float
     longitude: float
     radius_km: float = 10.0
+
+class UserStatusUpdate(BaseModel):
+    status: str  # Accept string, will validate against UserStatus values later
 
 # --- Hilfsfunktionen ---
 def get_db():
@@ -615,29 +618,57 @@ async def list_users(
     return db.query(UserModel).all()
 
 @app.patch("/api/users/{username}/status")
-async def update_user_status(
+async def update_user_status_endpoint(
     username: str,
-    status: UserStatus,
+    status_update: UserStatusUpdate,
     current_user: UserModel = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Update a user's status (admin only)"""
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(
-            status_code=403,
-            detail="Not authorized to update user status"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can update user status"
+        )
+    
+    if username == current_user.username:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot update your own status"
         )
     
     user = db.query(UserModel).filter(UserModel.username == username).first()
     if not user:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
     
-    user.status = status
-    db.commit()
-    return {"message": f"User status updated to {status.value}"}
+    try:
+        # Log received status
+        logger.info(f"Received status update for user {username}: {status_update.status}")
+        
+        # Get valid statuses and log them
+        valid_statuses = [status.value for status in UserStatus]
+        logger.info(f"Valid status values: {valid_statuses}")
+        
+        if status_update.status not in valid_statuses:
+            logger.error(f"Invalid status value received: {status_update.status}")
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid status value '{status_update.status}'. Must be one of: {', '.join(valid_statuses)}"
+            )
+        
+        # Set the status directly since we validated it's a valid value
+        user.status = UserStatus(status_update.status)
+        db.commit()
+        db.refresh(user)
+        return user.to_dict()
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid status value. Must be one of: {', '.join([s.value for s in UserStatus])}"
+        )
 
 @app.get("/api/users/pending", response_model=List[UserResponse])
 async def list_pending_users(
@@ -651,6 +682,43 @@ async def list_pending_users(
             detail="Not authorized to view pending users"
         )
     return db.query(UserModel).filter(UserModel.status == UserStatus.PENDING).all()
+
+@app.delete("/api/users/{username}")
+async def delete_user(
+    username: str,
+    current_user: UserModel = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a user (admin only)"""
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can delete users"
+        )
+    
+    if username == current_user.username:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete your own account"
+        )
+    
+    if username == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete the admin account"
+        )
+    
+    user = db.query(UserModel).filter(UserModel.username == username).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    db.delete(user)
+    db.commit()
+    
+    return {"message": f"User {username} has been deleted"}
 
 # Protect your existing endpoints with authentication
 # Example:
