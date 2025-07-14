@@ -53,6 +53,16 @@ export const useAuthStore = defineStore('auth', {
       this.token = null;
       this.user = null;
       localStorage.removeItem('token');
-    }
+    },
+    
+    async register(userData) {
+      try {
+        const response = await api.post('/api/auth/register', userData);
+        return { success: true, message: 'Registration successful! Please wait for admin approval.' };
+      } catch (error) {
+        console.error('Registration error:', error);
+        throw new Error(error.response?.data?.detail || 'Registration failed');
+      }
+    },
   }
 });

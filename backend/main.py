@@ -19,9 +19,12 @@ from auth import (
     authenticate_user,
     ACCESS_TOKEN_EXPIRE_MINUTES,
     create_initial_admin,
-    UserResponse
+    UserResponse,
+    UserCreate,
+    get_user,
+    get_user_by_email,
+    create_user
 )
-from schemas.users import User as UserSchema  # Import the User schema for response model
 
 # Initialize the database and tables
 from database import Base
@@ -575,6 +578,27 @@ async def login_for_access_token(
 @app.get("/users/me", response_model=UserResponse)
 async def read_users_me(current_user: UserModel = Depends(get_current_active_user)):
     return current_user
+
+@app.post("/api/auth/register", response_model=UserResponse)
+async def register_user(user: UserCreate, db: Session = Depends(get_db)):
+    """Register a new user"""
+    # Check if username already exists
+    if get_user(db, username=user.username):
+        raise HTTPException(
+            status_code=400,
+            detail="Username already registered"
+        )
+    
+    # Check if email already exists
+    if get_user_by_email(db, email=user.email):
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered"
+        )
+    
+    # Create new user
+    user = create_user(db=db, user=user)
+    return user
 
 # Protect your existing endpoints with authentication
 # Example:

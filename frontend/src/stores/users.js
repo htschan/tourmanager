@@ -26,7 +26,7 @@ export const useUserStore = defineStore('users', {
     async registerUser(userData) {
       this.loading = true
       try {
-        const response = await api.post('/register', userData)
+        const response = await api.post('/api/auth/register', userData)
         useToastStore().showSuccess('Registration successful! Waiting for admin approval.')
         return response.data
       } catch (error) {

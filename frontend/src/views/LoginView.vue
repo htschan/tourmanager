@@ -32,6 +32,11 @@
       <button type="submit" :disabled="loading">
         {{ loading ? 'Logging in...' : 'Login' }}
       </button>
+
+      <div class="register-link">
+        Don't have an account? 
+        <router-link to="/register">Register here</router-link>
+      </div>
     </form>
   </div>
 </template>
@@ -150,5 +155,21 @@ button:disabled {
   color: #dc3545;
   margin-bottom: 1rem;
   text-align: center;
+}
+
+.register-link {
+  text-align: center;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.register-link a {
+  color: #3498db;
+  text-decoration: none;
+}
+
+.register-link a:hover {
+  text-decoration: underline;
 }
 </style>

@@ -4,6 +4,7 @@ import Home from '../views/Home.vue'
 import Map from '../views/Map.vue'
 import Statistics from '../views/Statistics.vue'
 import LoginView from '../views/LoginView.vue'
+import RegisterView from '../views/RegisterView.vue'
 import ProfileView from '../views/ProfileView.vue'
 
 const routes = [
@@ -11,6 +12,12 @@ const routes = [
     path: '/login',
     name: 'Login',
     component: LoginView,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/register',
+    name: 'Register',
+    component: RegisterView,
     meta: { requiresAuth: false }
   },
   {
