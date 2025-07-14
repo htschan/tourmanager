@@ -13,11 +13,16 @@ export const useUserStore = defineStore('users', {
     async fetchUsers() {
       this.loading = true
       try {
+        console.log('🔍 Fetching users from API...')
         const response = await api.get('/api/users')
+        console.log('🔍 API Response:', response)
         this.users = response.data
+        return this.users
       } catch (error) {
+        console.error('❌ API Error:', error)
         this.error = error.message
-        useToastStore().showError('Failed to load users')
+        useToastStore().error('Failed to load users')
+        return []
       } finally {
         this.loading = false
       }
@@ -27,11 +32,11 @@ export const useUserStore = defineStore('users', {
       this.loading = true
       try {
         const response = await api.post('/api/auth/register', userData)
-        useToastStore().showSuccess('Registration successful! Waiting for admin approval.')
+        useToastStore().success('Registration successful! Waiting for admin approval.')
         return response.data
       } catch (error) {
         this.error = error.message
-        useToastStore().showError('Registration failed: ' + error.message)
+        useToastStore().error('Registration failed: ' + error.message)
         throw error
       } finally {
         this.loading = false
@@ -41,17 +46,18 @@ export const useUserStore = defineStore('users', {
     async updateUserStatus(username, status) {
       this.loading = true
       try {
-        const response = await api.patch(`/api/users/${username}/status`, JSON.stringify(status))
+        console.log('🔍 Sending status update:', { status })
+        const response = await api.patch(`/api/users/${username}/status`, { status: status })
         const updatedUser = response.data
         const index = this.users.findIndex(u => u.username === username)
         if (index !== -1) {
           this.users[index] = updatedUser
         }
-        useToastStore().showSuccess(`User ${username} status updated to ${status}`)
+        useToastStore().success(`User ${username} status updated to ${status}`)
         return updatedUser
       } catch (error) {
         this.error = error.message
-        useToastStore().showError('Failed to update user status')
+        useToastStore().error('Failed to update user status')
         throw error
       } finally {
         this.loading = false
@@ -63,7 +69,7 @@ export const useUserStore = defineStore('users', {
         const response = await api.get('/users/me')
         return response.data
       } catch (error) {
-        useToastStore().showError('Failed to load profile')
+        useToastStore().error('Failed to load profile')
         throw error
       }
     },
@@ -72,10 +78,10 @@ export const useUserStore = defineStore('users', {
       this.loading = true
       try {
         const response = await api.patch('/users/me', profileData)
-        useToastStore().showSuccess('Profile updated successfully')
+        useToastStore().success('Profile updated successfully')
         return response.data
       } catch (error) {
-        useToastStore().showError('Failed to update profile')
+        useToastStore().error('Failed to update profile')
         throw error
       } finally {
         this.loading = false
@@ -90,10 +96,10 @@ export const useUserStore = defineStore('users', {
             'Content-Type': 'multipart/form-data'
           }
         })
-        useToastStore().showSuccess('Avatar uploaded successfully')
+        useToastStore().success('Avatar uploaded successfully')
         return response.data
       } catch (error) {
-        useToastStore().showError('Failed to upload avatar')
+        useToastStore().error('Failed to upload avatar')
         throw error
       } finally {
         this.loading = false
@@ -140,6 +146,22 @@ export const useUserStore = defineStore('users', {
       } catch (error) {
         useToastStore().showError('Failed to verify email')
         throw error
+      }
+    },
+
+    async deleteUser(username) {
+      this.loading = true
+      try {
+        await api.delete(`/api/users/${username}`)
+        // Remove user from local state
+        this.users = this.users.filter(u => u.username !== username)
+        useToastStore().success(`User ${username} has been deleted`)
+      } catch (error) {
+        this.error = error.message
+        useToastStore().error('Failed to delete user')
+        throw error
+      } finally {
+        this.loading = false
       }
     }
   }

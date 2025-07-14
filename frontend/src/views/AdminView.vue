@@ -14,14 +14,14 @@
           <div class="user-actions">
             <button 
               class="approve-btn"
-              @click="updateUserStatus(user.username, 'active')"
+              @click="updateUserStatus(user.username, UserStatus.ACTIVE)"
               :disabled="loading"
             >
               Approve
             </button>
             <button 
               class="reject-btn"
-              @click="updateUserStatus(user.username, 'disabled')"
+              @click="updateUserStatus(user.username, UserStatus.DISABLED)"
               :disabled="loading"
             >
               Reject
@@ -44,20 +44,27 @@
           </div>
           <div class="user-actions">
             <button 
-              v-if="user.status !== 'active'"
+              v-if="user.status !== UserStatus.ACTIVE"
               class="approve-btn"
-              @click="updateUserStatus(user.username, 'active')"
+              @click="updateUserStatus(user.username, UserStatus.ACTIVE)"
               :disabled="loading"
             >
               Activate
             </button>
             <button 
-              v-if="user.status !== 'disabled'"
+              v-if="user.status !== UserStatus.DISABLED"
               class="reject-btn"
-              @click="updateUserStatus(user.username, 'disabled')"
+              @click="updateUserStatus(user.username, UserStatus.DISABLED)"
               :disabled="loading"
             >
               Disable
+            </button>
+            <button 
+              class="delete-btn"
+              @click="confirmDelete(user)"
+              :disabled="loading"
+            >
+              Delete
             </button>
           </div>
         </div>
@@ -70,21 +77,33 @@
 import { ref, onMounted } from 'vue'
 import { useUserStore } from '../stores/users'
 import { useToastStore } from '../stores/toast'
+import { UserStatus } from '../constants'
 
 const userStore = useUserStore()
 const toastStore = useToastStore()
+console.log('📝 Stores initialized:', { 
+  userStore: !!userStore, 
+  toastStore: !!toastStore,
+  toastMethods: Object.keys(toastStore)
+})
 const loading = ref(false)
 const allUsers = ref([])
 const pendingUsers = ref([])
 
 const fetchUsers = async () => {
   try {
+    console.log('📝 Fetching users...')
     loading.value = true
-    const users = await userStore.fetchUsers()
+    const users = await userStore.fetchUsers() || []
+    console.log('📝 Users fetched:', users)
     allUsers.value = users
-    pendingUsers.value = users.filter(user => user.status === 'pending')
+    pendingUsers.value = users?.filter(user => user.status === UserStatus.PENDING) || []
+    console.log('📝 Pending users:', pendingUsers.value)
   } catch (error) {
-    toastStore.showError('Failed to load users')
+    console.error('❌ Failed to fetch users:', error)
+    toastStore.error('Failed to load users')
+    allUsers.value = []
+    pendingUsers.value = []
   } finally {
     loading.value = false
   }
@@ -92,14 +111,35 @@ const fetchUsers = async () => {
 
 const updateUserStatus = async (username, status) => {
   try {
+    console.log(`📝 Updating user status - Username: ${username}, New Status: ${status}`)
     loading.value = true
     await userStore.updateUserStatus(username, status)
+    console.log('✅ User status updated successfully')
     await fetchUsers() // Refresh the lists
-    toastStore.showSuccess(`User ${username} has been ${status}`)
+    console.log('📝 Showing success toast notification')
+    toastStore.success(`User ${username} has been ${status}`)
   } catch (error) {
-    toastStore.showError('Failed to update user status')
+    console.error('❌ Failed to update user status:', error)
+    toastStore.error('Failed to update user status')
   } finally {
     loading.value = false
+    console.log('📝 Update user status operation completed')
+  }
+}
+
+const confirmDelete = async (user) => {
+  if (confirm(`Are you sure you want to delete user ${user.username}? This action cannot be undone.`)) {
+    try {
+      console.log(`📝 Deleting user: ${user.username}`)
+      loading.value = true
+      await userStore.deleteUser(user.username)
+      await fetchUsers() // Refresh the lists
+    } catch (error) {
+      console.error('❌ Failed to delete user:', error)
+    } finally {
+      loading.value = false
+      console.log('📝 Delete user operation completed')
+    }
   }
 }
 
@@ -186,6 +226,15 @@ button:disabled {
 
 .reject-btn:hover:not(:disabled) {
   background-color: #d44133;
+}
+
+.delete-btn {
+  background-color: #6c757d;
+  color: white;
+}
+
+.delete-btn:hover:not(:disabled) {
+  background-color: #5a6268;
 }
 
 .pending-users {
