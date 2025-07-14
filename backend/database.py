@@ -16,12 +16,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
-# Import all models to register them with SQLAlchemy
-from models import User, UserActivity  # noqa: E402
-
-# Create all tables
-Base.metadata.create_all(bind=engine)
-
 # Database Dependency
 def get_db():
     db = SessionLocal()

@@ -5,7 +5,7 @@ const API_BASE_URL = window.APP_CONFIG?.apiBaseUrl || import.meta.env.VITE_API_B
 
 console.log('🔧 API_BASE_URL:', API_BASE_URL)
 
-const apiClient = axios.create({
+export const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
   headers: {
@@ -14,9 +14,13 @@ const apiClient = axios.create({
 })
 
 // Request interceptor
-apiClient.interceptors.request.use(
+api.interceptors.request.use(
   (config) => {
-    // Add any auth headers here if needed
+    // Add auth token to requests if available
+    const token = localStorage.getItem('token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
     return config
   },
   (error) => {
@@ -25,7 +29,7 @@ apiClient.interceptors.request.use(
 )
 
 // Response interceptor
-apiClient.interceptors.response.use(
+api.interceptors.response.use(
   (response) => {
     return response
   },
@@ -50,34 +54,34 @@ apiClient.interceptors.response.use(
 export const tourApi = {
   // Get all tours with filters
   getTours: (params = {}) => {
-    return apiClient.get('/api/tours', { params })
+    return api.get('/api/tours', { params })
   },
 
   // Get specific tour details
   getTourDetail: (tourId) => {
-    return apiClient.get(`/api/tours/${tourId}`)
+    return api.get(`/api/tours/${tourId}`)
   },
 
   // Get tours near a location
   getNearbyTours: (locationData) => {
-    return apiClient.post('/api/tours/nearby', locationData)
+    return api.post('/api/tours/nearby', locationData)
   },
 
   // Get tours summary/statistics
   getSummary: () => {
-    return apiClient.get('/api/tours/summary')
+    return api.get('/api/tours/summary')
   },
 
   // Get available tour types
   getTourTypes: () => {
-    return apiClient.get('/api/tours/types')
+    return api.get('/api/tours/types')
   },
 
   // Get tours as GeoJSON for map display
   getToursGeoJSON: (params = {}) => {
     console.log('🔧 API getToursGeoJSON - params received:', params)
     console.log('🔧 API getToursGeoJSON - calling:', '/api/tours/geojson', { params })
-    return apiClient.get('/api/tours/geojson', { params })
+    return api.get('/api/tours/geojson', { params })
   }
 }
 
@@ -149,4 +153,4 @@ export const locationApi = {
   }
 }
 
-export default apiClient
+export default api

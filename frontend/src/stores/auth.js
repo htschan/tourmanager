@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { api } from '../services/api';
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -18,18 +19,14 @@ export const useAuthStore = defineStore('auth', {
         formData.append('username', username);
         formData.append('password', password);
         
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/token`, {
-          method: 'POST',
-          body: formData,
+        const response = await api.post('/token', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
         });
         
-        if (!response.ok) {
-          throw new Error('Login failed');
-        }
-        
-        const data = await response.json();
-        this.token = data.access_token;
-        localStorage.setItem('token', data.access_token);
+        this.token = response.data.access_token;
+        localStorage.setItem('token', response.data.access_token);
         
         // Fetch user data
         await this.fetchUser();
@@ -43,20 +40,12 @@ export const useAuthStore = defineStore('auth', {
     
     async fetchUser() {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/users/me`, {
-          headers: {
-            'Authorization': `Bearer ${this.token}`
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch user data');
-        }
-        
-        this.user = await response.json();
+        const response = await api.get('/users/me');
+        this.user = response.data;
       } catch (error) {
         console.error('Fetch user error:', error);
         this.logout();
+        throw error;
       }
     },
     
