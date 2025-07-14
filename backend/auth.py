@@ -106,7 +106,7 @@ def update_user_status(db: Session, username: str, status: UserStatus):
 def create_initial_admin(db: Session):
     admin = get_user(db, "admin")
     if not admin:
-        admin = User(
+        admin = UserModel(
             username="admin",
             email="admin@example.com",
             hashed_password=pwd_context.hash("admin"),

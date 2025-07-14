@@ -4,6 +4,16 @@ import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 
 export default defineConfig({
+  server: {
+    port: 3000,
+    proxy: {
+      '/api': {
+        target: 'http://backend:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '')
+      }
+    }
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -55,10 +65,6 @@ export default defineConfig({
       }
     })
   ],
-  server: {
-    host: '0.0.0.0',
-    port: 3000
-  },
   build: {
     outDir: 'dist',
     assetsDir: 'assets'

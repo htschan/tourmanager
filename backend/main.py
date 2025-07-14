@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import create_engine, text, func
+from models.users import User as UserModel
 from sqlalchemy.orm import sessionmaker, Session
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date, timedelta
@@ -16,11 +17,30 @@ from auth import (
     create_access_token,
     get_current_active_user,
     authenticate_user,
-    ACCESS_TOKEN_EXPIRE_MINUTES
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    create_initial_admin,
+    UserResponse,
+    UserCreate,
+    get_user,
+    get_user_by_email,
+    create_user
 )
-from models.users import User as UserModel
-from schemas.users import User as UserSchema
-from schemas.users import UserCreate, UserInDB, UserBase
+from models.users import UserRole, UserStatus
+
+# Initialize the database and tables
+from database import Base
+from models.users import User
+from models.activity import UserActivity
+
+# Create tables
+Base.metadata.create_all(bind=engine)
+
+# Initialize admin user
+db = SessionLocal()
+try:
+    create_initial_admin(db)
+finally:
+    db.close()
 
 class Token(BaseModel):
     access_token: str
@@ -29,31 +49,6 @@ class Token(BaseModel):
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# FastAPI App initialisieren
-app = FastAPI(
-    title="Tour Manager API",
-    description="API für die Verwaltung und Visualisierung von GPX-Touren",
-    version="1.0.0",
-)
-
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://tourm.bansom.synology.me",
-        "http://localhost:3000",  # for local development
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# --- Konfiguration ---
-DATABASE_FILE = os.getenv('DATABASE_PATH', os.path.join(os.path.dirname(__file__), 'scripts', 'touren.db'))
-print(f"DATABASE_FILE: {DATABASE_FILE}")
-engine = create_engine(f'sqlite:///{DATABASE_FILE}')
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # --- Lifespan Events ---
 from contextlib import asynccontextmanager
@@ -89,11 +84,18 @@ app.add_middleware(
     allow_origins=[
         "https://tourm.bansom.synology.me",
         "http://localhost:3000",  # für lokale Entwicklung
+        "http://localhost:3001",  # für lokale Entwicklung mit Vite
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- Konfiguration ---
+DATABASE_FILE = os.getenv('DATABASE_PATH', os.path.join(os.path.dirname(__file__), 'scripts', 'touren.db'))
+print(f"DATABASE_FILE: {DATABASE_FILE}")
+engine = create_engine(f'sqlite:///{DATABASE_FILE}')
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # --- Pydantic Models ---
 class TourBase(BaseModel):
@@ -574,9 +576,81 @@ async def login_for_access_token(
     
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.get("/users/me", response_model=UserSchema)
+@app.get("/users/me", response_model=UserResponse)
 async def read_users_me(current_user: UserModel = Depends(get_current_active_user)):
     return current_user
+
+@app.post("/api/auth/register", response_model=UserResponse)
+async def register_user(user: UserCreate, db: Session = Depends(get_db)):
+    """Register a new user"""
+    # Check if username already exists
+    if get_user(db, username=user.username):
+        raise HTTPException(
+            status_code=400,
+            detail="Username already registered"
+        )
+    
+    # Check if email already exists
+    if get_user_by_email(db, email=user.email):
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered"
+        )
+    
+    # Create new user
+    user = create_user(db=db, user=user)
+    return user
+
+@app.get("/api/users", response_model=List[UserResponse])
+async def list_users(
+    current_user: UserModel = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """List all users (admin only)"""
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to view user list"
+        )
+    return db.query(UserModel).all()
+
+@app.patch("/api/users/{username}/status")
+async def update_user_status(
+    username: str,
+    status: UserStatus,
+    current_user: UserModel = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Update a user's status (admin only)"""
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to update user status"
+        )
+    
+    user = db.query(UserModel).filter(UserModel.username == username).first()
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+    
+    user.status = status
+    db.commit()
+    return {"message": f"User status updated to {status.value}"}
+
+@app.get("/api/users/pending", response_model=List[UserResponse])
+async def list_pending_users(
+    current_user: UserModel = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """List all pending users (admin only)"""
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to view pending users"
+        )
+    return db.query(UserModel).filter(UserModel.status == UserStatus.PENDING).all()
 
 # Protect your existing endpoints with authentication
 # Example:

@@ -13,7 +13,7 @@ export const useUserStore = defineStore('users', {
     async fetchUsers() {
       this.loading = true
       try {
-        const response = await api.get('/users')
+        const response = await api.get('/api/users')
         this.users = response.data
       } catch (error) {
         this.error = error.message
@@ -26,7 +26,7 @@ export const useUserStore = defineStore('users', {
     async registerUser(userData) {
       this.loading = true
       try {
-        const response = await api.post('/register', userData)
+        const response = await api.post('/api/auth/register', userData)
         useToastStore().showSuccess('Registration successful! Waiting for admin approval.')
         return response.data
       } catch (error) {
@@ -41,7 +41,7 @@ export const useUserStore = defineStore('users', {
     async updateUserStatus(username, status) {
       this.loading = true
       try {
-        const response = await api.patch(`/users/${username}/status`, JSON.stringify(status))
+        const response = await api.patch(`/api/users/${username}/status`, JSON.stringify(status))
         const updatedUser = response.data
         const index = this.users.findIndex(u => u.username === username)
         if (index !== -1) {
