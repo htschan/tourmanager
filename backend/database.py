@@ -3,10 +3,11 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
 
-SQLALCHEMY_DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "sqlite:///./tourmanager.db"
-)
+DATABASE_PATH = os.getenv("DATABASE_PATH", "./tourmanager.db")
+# Ensure database directory exists
+os.makedirs(os.path.dirname(DATABASE_PATH), exist_ok=True)
+
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
