@@ -17,11 +17,12 @@ services:
       - DATABASE_PATH=/app/data/tourmanager.db
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
-      interval: 10s
-      timeout: 30s
-      retries: 5
-      start_period: 30s
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug"]
 
   frontend:
     build: ./frontend
