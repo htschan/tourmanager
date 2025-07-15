@@ -7,17 +7,31 @@ from main import app
 TEST_DB = "test_database.db"
 
 @pytest.fixture(autouse=True)
-def setup_test_env(tmp_path):
+def setup_test_env():
     """Setup test environment variables before each test"""
-    # Create a temporary database file
-    test_db_path = str(tmp_path / TEST_DB)
-    
     # Set test environment variables
     test_env = {
+        "ENV": "test",  # Tell the app we're in test mode
         "JWT_SECRET_KEY": "test-secret-key-for-testing",
-        "DATABASE_PATH": test_db_path,
+        "DATABASE_PATH": ":memory:",  # Use in-memory database for tests
         "PORT": "8000"
     }
+    
+    # Store original environment
+    original_env = {key: os.getenv(key) for key in test_env.keys()}
+    
+    # Set test environment
+    for key, value in test_env.items():
+        os.environ[key] = value
+        
+    yield
+    
+    # Restore original environment
+    for key, value in original_env.items():
+        if value is None:
+            del os.environ[key]
+        else:
+            os.environ[key] = value
     
     # Backup existing env vars
     old_env = {key: os.environ.get(key) for key in test_env.keys()}
@@ -27,16 +41,7 @@ def setup_test_env(tmp_path):
     
     yield
     
-    # Restore original env vars
-    for key, value in old_env.items():
-        if value is None:
-            os.environ.pop(key, None)
-        else:
-            os.environ[key] = value
-            
-    # Cleanup test database
-    if os.path.exists(test_db_path):
-        os.unlink(test_db_path)
+    # Environment cleanup is handled in the new fixture
 
 # Create test client
 client = TestClient(app)
