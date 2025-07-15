@@ -94,10 +94,13 @@ jobs:
 
       # Test the stack
       - name: Test Stack
+        timeout-minutes: 10  # Set a generous timeout for the entire step
         run: |
           # Create backend .env file with test configuration
           mkdir -p backend
           cat > backend/.env << EOL
+          ENV=test
+          DOCKER_ENV=true
           JWT_SECRET_KEY=test-secret-key-for-ci
           DATABASE_PATH=/app/scripts/touren.db
           PORT=8000

@@ -195,6 +195,11 @@ async def root():
     """Health Check Endpoint"""
     return {"message": "Tour Manager API is running", "version": "1.0.0"}
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Docker"""
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
 @app.get("/api/tours", response_model=List[TourBase])
 async def get_tours(
     tour_type: Optional[str] = Query(None, description="Filter nach Tour-Typ (Bike, Hike, Inline, etc.)"),
