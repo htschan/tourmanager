@@ -23,3 +23,12 @@ def get_db():
         yield db
     finally:
         db.close()
+
+def init_db():
+    """Initialize the database and create all tables"""
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("✅ Database tables created successfully")
+    except Exception as e:
+        print(f"❌ Error creating database tables: {e}")
+        raise

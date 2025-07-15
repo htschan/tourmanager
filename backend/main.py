@@ -28,17 +28,25 @@ from auth import (
 from models.users import UserRole, UserStatus
 
 # Initialize the database and tables
-from database import Base
+from database import Base, init_db
 from models.users import User
 from models.activity import UserActivity
 
-# Create tables
-Base.metadata.create_all(bind=engine)
+# Create tables and initialize database
+try:
+    init_db()
+except Exception as e:
+    logger.error(f"Failed to initialize database: {e}")
+    raise
 
 # Initialize admin user
-db = SessionLocal()
 try:
+    db = SessionLocal()
     create_initial_admin(db)
+    logger.info("✅ Admin user initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize admin user: {e}")
+    raise
 finally:
     db.close()
 
@@ -93,7 +101,11 @@ app.add_middleware(
 
 # --- Konfiguration ---
 DATABASE_FILE = os.getenv('DATABASE_PATH', os.path.join(os.path.dirname(__file__), 'scripts', 'touren.db'))
-print(f"DATABASE_FILE: {DATABASE_FILE}")
+logger.info(f"DATABASE_FILE: {DATABASE_FILE}")
+
+# Ensure database directory exists
+os.makedirs(os.path.dirname(DATABASE_FILE), exist_ok=True)
+
 engine = create_engine(f'sqlite:///{DATABASE_FILE}')
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
