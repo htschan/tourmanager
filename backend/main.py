@@ -110,14 +110,7 @@ app.add_middleware(
 )
 
 # --- Konfiguration ---
-DATABASE_FILE = os.getenv('DATABASE_PATH', os.path.join(os.path.dirname(__file__), 'scripts', 'touren.db'))
-logger.info(f"DATABASE_FILE: {DATABASE_FILE}")
-
-# Ensure database directory exists
-os.makedirs(os.path.dirname(DATABASE_FILE), exist_ok=True)
-
-engine = create_engine(f'sqlite:///{DATABASE_FILE}')
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Database configuration is handled in database.py
 
 # --- Pydantic Models ---
 class TourBase(BaseModel):

@@ -13,8 +13,17 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Create scripts directory and set permissions
+RUN mkdir -p /app/scripts && chown -R nobody:nogroup /app/scripts
+
 # App code
 COPY . .
+
+# Set permissions for the app directory
+RUN chown -R nobody:nogroup /app
+
+# Switch to non-root user
+USER nobody
 
 # Expose port
 EXPOSE 8000
