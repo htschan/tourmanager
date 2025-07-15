@@ -1,5 +1,9 @@
 FROM python:3.11-slim
 
+# Create a non-root user with explicit UID/GID
+RUN groupadd -r appgroup --gid=1000 && \
+    useradd -r -g appgroup --uid=1000 -d /app appuser
+
 WORKDIR /app
 
 # System dependencies
@@ -9,21 +13,22 @@ RUN apt-get update && apt-get install -y \
     sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Create necessary directories and set ownership
+RUN mkdir -p /app/scripts /app/data && \
+    chown -R appuser:appgroup /app
 
-# Create scripts directory and set permissions
-RUN mkdir -p /app/scripts && chown -R nobody:nogroup /app/scripts
+# Switch to non-root user for subsequent commands
+USER appuser
 
-# App code
-COPY . .
+# Python dependencies - install as non-root user
+COPY --chown=appuser:appgroup requirements.txt .
+RUN pip install --user --no-cache-dir -r requirements.txt
 
-# Set permissions for the app directory
-RUN chown -R nobody:nogroup /app
+# Add local user binary to PATH
+ENV PATH=/app/.local/bin:$PATH
 
-# Switch to non-root user
-USER nobody
+# Copy application code as non-root user
+COPY --chown=appuser:appgroup . .
 
 # Expose port
 EXPOSE 8000

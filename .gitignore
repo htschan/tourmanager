@@ -4,3 +4,4 @@ scripts/touren.db
 touren/
 .venv/
 stack.yml
+data/tourmanager.db
