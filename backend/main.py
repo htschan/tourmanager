@@ -41,6 +41,7 @@ from models.users import UserRole, UserStatus
 from database import Base, init_db
 from models.users import User
 from models.activity import UserActivity
+from models.tours import Tour  # Import the Tour model
 
 # Create tables and initialize database
 try:
