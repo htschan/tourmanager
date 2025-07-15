@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, text
 
 # --- Konfiguration ---
 GPX_FOLDER = '../touren'  # <-- HIER DEINEN PFAD EINFÜGEN
-DATABASE_FILE = 'touren.db'
+DATABASE_FILE = 'tourmanager.db'
 engine = create_engine(f'sqlite:///{DATABASE_FILE}')
 
 def parse_and_store_gpx(file_path):

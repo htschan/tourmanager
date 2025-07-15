@@ -3,9 +3,18 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
 
-DATABASE_PATH = os.getenv("DATABASE_PATH", "./tourmanager.db")
+# Set default database path based on environment
+if os.getenv("DOCKER_ENV") == "true":
+    default_db_path = "/app/data/tourmanager.db"
+else:
+    default_db_path = "./tourmanager.db"
+
+DATABASE_PATH = os.getenv("DATABASE_PATH", default_db_path)
+
 # Ensure database directory exists
-os.makedirs(os.path.dirname(DATABASE_PATH), exist_ok=True)
+db_dir = os.path.dirname(DATABASE_PATH)
+if db_dir:  # Only try to create directory if path contains a directory part
+    os.makedirs(db_dir, exist_ok=True)
 
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 

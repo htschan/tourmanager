@@ -7,11 +7,14 @@ services:
       - "8000:8000"
     volumes:
       - ./scripts:/app/scripts
+      - ./data:/app/data
     env_file:
       - ./backend/.env
     # For local development, you can override the JWT secret here
     environment:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-local-development-key}
+      - DOCKER_ENV=true
+      - DATABASE_PATH=/app/data/tourmanager.db
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
