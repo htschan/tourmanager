@@ -32,16 +32,6 @@ def setup_test_env():
             del os.environ[key]
         else:
             os.environ[key] = value
-    
-    # Backup existing env vars
-    old_env = {key: os.environ.get(key) for key in test_env.keys()}
-    
-    # Set test env vars
-    os.environ.update(test_env)
-    
-    yield
-    
-    # Environment cleanup is handled in the new fixture
 
 # Create test client
 client = TestClient(app)
