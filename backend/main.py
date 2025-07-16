@@ -33,7 +33,9 @@ from auth import (
     UserCreate,
     get_user,
     get_user_by_email,
-    create_user
+    create_user,
+    PasswordChangeRequest,
+    change_password
 )
 from models.users import UserRole, UserStatus
 
@@ -740,6 +742,15 @@ async def delete_user(
     db.commit()
     
     return {"message": f"User {username} has been deleted"}
+
+# Password change endpoint
+@app.post("/api/users/change-password")
+async def change_password_endpoint(
+    password_change: PasswordChangeRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    return await change_password(password_change, current_user, db)
 
 # Protect your existing endpoints with authentication
 # Example:

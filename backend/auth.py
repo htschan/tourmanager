@@ -63,6 +63,10 @@ class UserResponse(BaseModel):
     created_at: datetime
     last_login: Optional[datetime] = None
 
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str
+
 def get_db():
     from database import SessionLocal
     db = SessionLocal()
@@ -122,6 +126,45 @@ def create_initial_admin(db: Session):
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+def change_user_password(db: Session, username: str, current_password: str, new_password: str) -> bool:
+    db_user = get_user(db, username)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Verify current password
+    if not verify_password(current_password, db_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    # Update password
+    db_user.hashed_password = get_password_hash(new_password)
+    db.commit()
+    return True
+
+async def change_password(
+    password_change: PasswordChangeRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+) -> dict:
+    """
+    Change the password for the current user.
+    Requires current password and new password.
+    """
+    try:
+        success = change_user_password(
+            db,
+            current_user.username,
+            password_change.current_password,
+            password_change.new_password
+        )
+        return {"message": "Password changed successfully"}
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 def authenticate_user(db: Session, username: str, password: str) -> Optional[UserModel]:
     user = get_user(db, username)

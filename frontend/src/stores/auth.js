@@ -65,5 +65,19 @@ export const useAuthStore = defineStore('auth', {
         throw new Error(error.response?.data?.detail || 'Registration failed');
       }
     },
+    
+    async changePassword(currentPassword, newPassword) {
+      try {
+        const response = await api.post('/api/users/change-password', {
+          current_password: currentPassword,
+          new_password: newPassword
+        });
+        return { success: true, message: response.data.message };
+      } catch (error) {
+        console.error('Password change error:', error);
+        const message = error.response?.data?.detail || 'Failed to change password';
+        return { success: false, message };
+      }
+    },
   }
 });
