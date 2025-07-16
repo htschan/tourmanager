@@ -33,21 +33,27 @@ class UserUpdate(BaseModel):
 
 
 class UserResponse(UserBase):
-    role: str
-    status: str
+    role: UserRole
+    status: UserStatus
     created_at: datetime
     last_login: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
 
 
 class UserInDB(UserBase):
     hashed_password: str
-    role: str
-    status: str
+    role: UserRole
+    status: UserStatus
     created_at: datetime
     last_login: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
