@@ -94,7 +94,7 @@ jobs:
 
       # Test the stack
       - name: Test Stack
-        timeout-minutes: 15  # Increased timeout for the entire step
+        timeout-minutes: 15
         run: |
           # Create backend .env file with test configuration
           mkdir -p backend
@@ -106,10 +106,16 @@ jobs:
           PORT=8000
           EOL
           
-          # Create data directory for database
+          # Create data directory and set permissions
           mkdir -p data
+          # Ensure directory has correct permissions (readable/writable by all)
+          chmod 777 data
+          # Create an empty database file
           touch data/tourmanager.db
-          chmod 777 data/tourmanager.db
+          # Ensure database file has correct permissions
+          chmod 666 data/tourmanager.db
+          # Show permissions for debugging
+          ls -la data/
           
           # Update image names in docker-compose.yml
           backend_image="${{ steps.meta.outputs.backend_image }}"
@@ -122,6 +128,10 @@ jobs:
           # Update docker-compose.yml
           sed -i "s|build: ./backend|image: $backend_image|" docker-compose.yml
           sed -i "s|build: ./frontend|image: $frontend_image|" docker-compose.yml
+          
+          # Debug: Show docker-compose.yml content
+          echo "docker-compose.yml content:"
+          cat docker-compose.yml
           
           # Start containers
           docker compose up -d
@@ -141,6 +151,12 @@ jobs:
               # Show recent logs
               echo "Recent logs for $service:"
               docker compose logs --tail=50 $service
+              
+              # For backend, also show database permissions
+              if [ "$service" = "backend" ]; then
+                echo "Database file permissions:"
+                docker compose exec backend ls -la /app/data/
+              fi
               
               # Try to access the health endpoint
               if curl -s -f "$url" > /dev/null; then
