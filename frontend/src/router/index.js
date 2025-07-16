@@ -5,7 +5,7 @@ import Map from '../views/Map.vue'
 import Statistics from '../views/Statistics.vue'
 import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
-import ProfileView from '../views/ProfileView.vue'
+import ProfileView from '../views/Profile.vue'
 import AdminView from '../views/AdminView.vue'
 
 const routes = [

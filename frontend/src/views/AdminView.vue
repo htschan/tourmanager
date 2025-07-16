@@ -62,7 +62,8 @@
             <button 
               class="delete-btn"
               @click="confirmDelete(user)"
-              :disabled="loading"
+              :disabled="loading || (authStore.getUser?.username === user.username)"
+              :title="authStore.getUser?.username === user.username ? 'Cannot delete your own account' : ''"
             >
               Delete
             </button>
@@ -76,10 +77,12 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useUserStore } from '../stores/users'
+import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toast'
 import { UserStatus } from '../constants'
 
 const userStore = useUserStore()
+const authStore = useAuthStore()
 const toastStore = useToastStore()
 console.log('📝 Stores initialized:', { 
   userStore: !!userStore, 
@@ -128,14 +131,23 @@ const updateUserStatus = async (username, status) => {
 }
 
 const confirmDelete = async (user) => {
+  // Check if user is trying to delete themselves
+  const currentUser = authStore.getUser
+  if (currentUser && currentUser.username === user.username) {
+    toastStore.error('Cannot delete your own admin account')
+    return
+  }
+
   if (confirm(`Are you sure you want to delete user ${user.username}? This action cannot be undone.`)) {
     try {
       console.log(`📝 Deleting user: ${user.username}`)
       loading.value = true
       await userStore.deleteUser(user.username)
       await fetchUsers() // Refresh the lists
+      toastStore.success(`User ${user.username} has been deleted`)
     } catch (error) {
       console.error('❌ Failed to delete user:', error)
+      toastStore.error(error.response?.data?.detail || 'Failed to delete user')
     } finally {
       loading.value = false
       console.log('📝 Delete user operation completed')
@@ -235,6 +247,11 @@ button:disabled {
 
 .delete-btn:hover:not(:disabled) {
   background-color: #5a6268;
+}
+
+.delete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .pending-users {
