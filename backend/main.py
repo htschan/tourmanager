@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import create_engine, text, func
-from models.users import User as UserModel
+from models.users import User as UserModel, UserRole, UserStatus
 from sqlalchemy.orm import sessionmaker, Session
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date, timedelta
@@ -12,6 +12,7 @@ import json
 import math
 import os
 import logging
+import uvicorn
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -22,54 +23,40 @@ formatter = logging.Formatter('%(asctime)s | %(levelname)s: %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-from database import SessionLocal, engine, get_db  # Import database utilities
+from database import SessionLocal, engine, get_db
 from auth import (
     create_access_token,
     get_current_active_user,
     authenticate_user,
     ACCESS_TOKEN_EXPIRE_MINUTES,
     create_initial_admin,
+    Token,
     UserResponse,
     UserCreate,
-    get_user,
-    get_user_by_email,
-    create_user,
     PasswordChangeRequest,
+    get_user,
+    get_password_hash,
+    verify_password,
     change_password
 )
-from models.users import UserRole, UserStatus
 
-# Initialize the database and tables
-from database import Base, init_db
-from models.users import User
-from models.activity import UserActivity
-from models.tours import Tour  # Import the Tour model
+from routers.users import create_user, get_user_by_email
 
-# Create tables and initialize database
-try:
-    init_db()
-except Exception as e:
-    logger.error(f"Failed to initialize database: {e}")
-    raise
+app = FastAPI()
 
-# Initialize admin user
-try:
-    db = SessionLocal()
-    create_initial_admin(db)
-    logger.info("✅ Admin user initialized successfully")
-except Exception as e:
-    logger.error(f"Failed to initialize admin user: {e}")
-    raise
-finally:
-    db.close()
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with specific origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Create initial admin user on startup
+@app.on_event("startup")
+async def startup_event():
+    create_initial_admin()
 
 # --- Lifespan Events ---
 from contextlib import asynccontextmanager
@@ -743,11 +730,10 @@ async def delete_user(
     
     return {"message": f"User {username} has been deleted"}
 
-# Password change endpoint
-@app.post("/api/users/change-password")
+@app.post("/api/auth/change-password")
 async def change_password_endpoint(
     password_change: PasswordChangeRequest,
-    current_user: User = Depends(get_current_active_user),
+    current_user: UserModel = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     return await change_password(password_change, current_user, db)
@@ -759,5 +745,4 @@ async def change_password_endpoint(
 #     return {"message": "This is a protected route"}
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

@@ -126,3 +126,61 @@ def authenticate_user(db: Session, username: str, password: str):
     if not user or not verify_password(password, user.hashed_password):
         return False
     return user
+
+def create_initial_admin(db: Session = None):
+    """
+    Create initial admin user if it doesn't exist.
+    Uses environment variables ADMIN_USERNAME, ADMIN_PASSWORD, and ADMIN_EMAIL.
+    Falls back to default values if environment variables are not set.
+    """
+    if db is None:
+        db = SessionLocal()
+
+    try:
+        # Check if admin user already exists
+        admin_username = os.getenv("ADMIN_USERNAME", "admin")
+        admin = get_user(db, username=admin_username)
+        
+        if not admin:
+            # Create admin user
+            admin_password = os.getenv("ADMIN_PASSWORD", "admin123")  # Default password should be changed immediately
+            admin_email = os.getenv("ADMIN_EMAIL", "admin@example.com")
+            
+            admin = UserModel(
+                username=admin_username,
+                email=admin_email,
+                hashed_password=get_password_hash(admin_password),
+                role=UserRole.ADMIN,
+                status=UserStatus.ACTIVE,
+                created_at=datetime.utcnow()
+            )
+            
+            db.add(admin)
+            db.commit()
+            db.refresh(admin)
+            
+            logger.info(f"Created initial admin user: {admin_username}")
+        else:
+            logger.info(f"Admin user already exists: {admin_username}")
+            
+        return admin
+    
+    except Exception as e:
+        logger.error(f"Error creating initial admin user: {str(e)}")
+        db.rollback()
+        raise
+    finally:
+        if db:
+            db.close()
+
+async def change_password(password_change: PasswordChangeRequest, user: UserModel, db: Session):
+    """Change user password"""
+    if not verify_password(password_change.current_password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+    
+    user.hashed_password = get_password_hash(password_change.new_password)
+    db.commit()
+    return {"message": "Password updated successfully"}
