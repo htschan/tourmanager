@@ -94,7 +94,7 @@ jobs:
 
       # Test the stack
       - name: Test Stack
-        timeout-minutes: 10  # Set a generous timeout for the entire step
+        timeout-minutes: 15  # Increased timeout for the entire step
         run: |
           # Create backend .env file with test configuration
           mkdir -p backend
@@ -102,9 +102,14 @@ jobs:
           ENV=test
           DOCKER_ENV=true
           JWT_SECRET_KEY=test-secret-key-for-ci
-          DATABASE_PATH=/app/scripts/touren.db
+          DATABASE_PATH=/app/data/tourmanager.db
           PORT=8000
           EOL
+          
+          # Create data directory for database
+          mkdir -p data
+          touch data/tourmanager.db
+          chmod 777 data/tourmanager.db
           
           # Update image names in docker-compose.yml
           backend_image="${{ steps.meta.outputs.backend_image }}"
@@ -121,18 +126,42 @@ jobs:
           # Start containers
           docker compose up -d
           
-          # Show logs for debugging
-          echo "Backend container logs:"
-          docker compose logs backend
+          # Function to check service health
+          check_service() {
+            local service=$1
+            local url=$2
+            local max_attempts=$3
+            local wait_seconds=$4
+            
+            echo "Waiting for $service to be ready at $url (max ${max_attempts} attempts, ${wait_seconds}s each)..."
+            
+            for i in $(seq 1 $max_attempts); do
+              echo "Attempt $i/$max_attempts for $service..."
+              
+              # Show recent logs
+              echo "Recent logs for $service:"
+              docker compose logs --tail=50 $service
+              
+              # Try to access the health endpoint
+              if curl -s -f "$url" > /dev/null; then
+                echo "$service is ready!"
+                return 0
+              fi
+              
+              sleep $wait_seconds
+            done
+            
+            echo "$service failed to become ready"
+            echo "Final logs for $service:"
+            docker compose logs $service
+            return 1
+          }
           
-          # Wait for services to be healthy
-          echo "Waiting for backend to be ready..."
-          timeout 30 bash -c 'until curl -s http://localhost:8000/ > /dev/null; do sleep 1; done'
-          echo "Backend is ready"
+          # Check backend health (60 attempts, 2 seconds each = 2 minutes total)
+          check_service "backend" "http://localhost:8000/health" 60 2 || exit 1
           
-          echo "Waiting for frontend to be ready..."
-          timeout 60 bash -c 'until curl -s http://localhost:3001/ > /dev/null; do sleep 1; done'
-          echo "Frontend is ready"
+          # Check frontend availability (30 attempts, 2 seconds each = 1 minute total)
+          check_service "frontend" "http://localhost:3001/" 30 2 || exit 1
           
           # Run frontend tests
           echo "Running frontend tests..."
@@ -142,6 +171,10 @@ jobs:
           # Then run tests
           npm test
           cd ..
+          
+          # Show final status
+          echo "Container status:"
+          docker compose ps
           
           # Cleanup
           docker compose down
