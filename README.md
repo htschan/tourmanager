@@ -10,7 +10,6 @@ Das Projekt wurde kreiert durch Github Copilot mit dem Claude Sonnet 3.5 Model i
 
 Der Download von GPX-Touren erfolgt von deinem Konto in komoot.de mit dem Tool https://github.com/timschneeb/KomootGPX.
 
-
 ## 🏗️ Architektur
 
 ```
@@ -64,6 +63,8 @@ npm run dev
 - 📈 **Statistiken** und Zusammenfassungen
 - 🔐 **Benutzerauthentifizierung** mit JWT und Admin-Benutzer
 - 🚀 **Automatische Initialisierung** der Datenbank und Admin-Account
+- 🏥 **Health Check** Endpoint für Container-Orchestrierung
+- 🔄 **Automatische Wiederherstellung** bei Datenbankfehlern
 
 ### Frontend (Vue.js PWA)
 - 🗺️ **Interaktive Karten** mit OpenStreetMap/Leaflet
@@ -76,6 +77,8 @@ npm run dev
 - 🔐 **Authentifizierung** mit JWT
 - 🌓 **Dark/Light Mode** Support
 - 🏗️ **Build Info** (Timestamp & Git SHA)
+- 🐞 **Debug Panel** für Entwicklung
+- 🔄 **Automatische Aktualisierung** der Tour-Daten
 
 ### GPX Import System
 - 📥 **Batch-Import** aller GPX-Dateien
@@ -84,6 +87,65 @@ npm run dev
 - 📊 **Automatische Typ-Erkennung** (Bike/Hike/Inline)
 - ⚡ **E-Bike Erkennung**
 - 📏 **Höhenprofil-Analyse**
+- 🔄 **Inkrementeller Import** neuer Touren
+
+## 🚢 Deployment
+
+### Docker Compose (Entwicklung)
+```yaml
+version: '3.8'
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./scripts:/app/scripts
+      - ./data:/app/data
+    environment:
+      - JWT_SECRET_KEY=your-dev-key
+      - DOCKER_ENV=true
+      - DATABASE_PATH=/app/data/tourmanager.db
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3001:3000"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+```
+
+### Docker Stack (Production)
+```yaml
+services:
+  tourm-backend:
+    image: hub.bansom.synology.me/tourmbackend:latest
+    restart: on-failure:5
+    ports:
+      - 8000:8000
+    volumes:
+      - /volume1/docker/tourmbackend:/app/scripts
+      - /volume1/docker/tourmdata:/app/data
+    secrets:
+      - jwt_secret
+    environment:
+      - JWT_SECRET_KEY_FILE=/run/secrets/jwt_secret
+      - DATABASE_PATH=/app/data/tourmanager.db
+      - DOCKER_ENV=true
+
+  tourm-frontend:
+    image: hub.bansom.synology.me/tourmui:latest
+    restart: unless-stopped
+    ports:
+      - 3001:3000
+    environment:
+      - VITE_API_BASE_URL=https://tourmbackend.bansom.synology.me
+
+secrets:
+  jwt_secret:
+    external: true
+    name: tourm_jwt_secret
+```
 
 ## 🗺️ Karten-Features
 
@@ -92,6 +154,8 @@ npm run dev
 - **Interactive Tooltips** mit Tour-Informationen
 - **Vollbild-Modus** für detaillierte Ansicht
 - **Touch-optimierte Bedienung** für Mobile
+- **Clustering** für bessere Performance
+- **Debug-Overlay** für Entwicklung
 
 ## 🔐 Authentifizierung & Datenbank
 
