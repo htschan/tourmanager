@@ -131,7 +131,7 @@ jobs:
           echo "Backend is ready"
           
           echo "Waiting for frontend to be ready..."
-          timeout 30 bash -c 'until curl -s http://localhost:3001/ > /dev/null; do sleep 1; done'
+          timeout 60 bash -c 'until curl -s http://localhost:3001/ > /dev/null; do sleep 1; done'
           echo "Frontend is ready"
           
           # Run frontend tests
