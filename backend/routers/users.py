@@ -4,17 +4,38 @@ from typing import List
 from auth import (
     get_db,
     get_current_active_user,
-    create_user,
-    get_users,
     get_user,
-    update_user_status,
-    UserCreate,
-    UserUpdate,
-    UserResponse
+    get_password_hash,
 )
 from models.users import User, UserRole, UserStatus
+from schemas.users import UserCreate, UserResponse, UserUpdate
 
 router = APIRouter()
+
+def create_user(db: Session, user: UserCreate):
+    hashed_password = get_password_hash(user.password)
+    db_user = User(
+        username=user.username,
+        email=user.email,
+        hashed_password=hashed_password,
+        role=UserRole.USER,
+        status=UserStatus.ACTIVE
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+def get_users(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(User).offset(skip).limit(limit).all()
+
+def update_user_status(db: Session, username: str, status: UserStatus):
+    user = get_user(db, username)
+    if user:
+        user.status = status
+        db.commit()
+        db.refresh(user)
+    return user
 
 @router.post("/register", response_model=UserResponse)
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
