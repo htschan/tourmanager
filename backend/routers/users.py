@@ -73,3 +73,46 @@ async def update_user_status_endpoint(
             detail="User not found"
         )
     return updated_user
+
+@router.delete("/users/{username}")
+async def delete_user(
+    username: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a user. Admin users cannot delete themselves.
+    """
+    # Check if user is admin
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to delete users"
+        )
+    
+    # Prevent admin from deleting themselves
+    if current_user.username == username:
+        raise HTTPException(
+            status_code=400,
+            detail="Admin users cannot delete their own account"
+        )
+    
+    # Get the user to delete
+    user_to_delete = get_user(db, username=username)
+    if not user_to_delete:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+    
+    # Delete the user
+    try:
+        db.delete(user_to_delete)
+        db.commit()
+        return {"message": f"User {username} has been deleted"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete user: {str(e)}"
+        )
