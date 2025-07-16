@@ -4,10 +4,10 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from models.users import User as UserModel, UserRole, UserStatus
-from schemas.users import User, UserCreate, UserInDB, UserBase
+from schemas.users import UserCreate, UserResponse, UserUpdate, UserInDB
+from schemas.auth import Token, TokenData, PasswordChangeRequest
 from database import SessionLocal
 
 # Environment variables for authentication
@@ -46,36 +46,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
-# Models
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-class TokenData(BaseModel):
-    username: Optional[str] = None
-
-class UserCreate(BaseModel):
-    username: str
-    email: EmailStr
-    password: str
-
-class UserUpdate(BaseModel):
-    email: Optional[EmailStr] = None
-    password: Optional[str] = None
-    status: Optional[str] = None
-
-class UserResponse(BaseModel):
-    username: str
-    email: EmailStr
-    role: str
-    status: str
-    created_at: datetime
-    last_login: Optional[datetime] = None
-
-class PasswordChangeRequest(BaseModel):
-    current_password: str
-    new_password: str
 
 # Helper functions
 def verify_password(plain_password, hashed_password):
