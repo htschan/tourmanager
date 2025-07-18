@@ -59,11 +59,11 @@ async function handleLogin() {
   error.value = '';
   
   try {
-    const success = await authStore.login(username.value, password.value);
-    if (success) {
+    const result = await authStore.login(username.value, password.value);
+    if (result.success) {
       router.push('/');
     } else {
-      error.value = 'Invalid username or password';
+      error.value = result.message;
     }
   } catch (e) {
     error.value = 'An error occurred during login';

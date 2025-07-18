@@ -15,8 +15,17 @@ import logging
 import uvicorn
 
 # Configure logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger = logging.getLogger(__name    # Username, hash, and status are extracted above
+    print(f"Found user {username} with hash: {stored_hash} and status: {user_status}")
+    
+    # Verify password
+    if not pwd_context.verify(form_data.password, stored_hash):
+        print(f"Password verification failed for {username}")
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        }.setLevel(logging.INFO)
 handler = logging.StreamHandler()
 handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s | %(levelname)s: %(message)s')
@@ -620,8 +629,8 @@ async def login_for_access_token(
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
-    # Check if user exists
-    cursor.execute("SELECT username, hashed_password FROM users WHERE username = ?", (form_data.username,))
+    # Check if user exists and get status
+    cursor.execute("SELECT username, hashed_password, status FROM users WHERE username = ?", (form_data.username,))
     user_data = cursor.fetchone()
     conn.close()
     
@@ -630,6 +639,17 @@ async def login_for_access_token(
         raise HTTPException(
             status_code=401,
             detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+        
+    username, stored_hash, user_status = user_data
+    
+    # Check if user is pending approval
+    if user_status == UserStatus.PENDING.value:
+        print(f"User {form_data.username} is pending approval")
+        raise HTTPException(
+            status_code=403,
+            detail="Your account is pending approval by an administrator",
             headers={"WWW-Authenticate": "Bearer"},
         )
     

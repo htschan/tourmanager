@@ -32,10 +32,20 @@ export const useAuthStore = defineStore('auth', {
         // Fetch user data
         await this.fetchUser();
         
-        return true;
+        return { success: true };
       } catch (error) {
         console.error('Login error:', error);
-        return false;
+        // Check if this is a pending approval error
+        if (error.response?.status === 403 && error.response?.data?.detail?.includes('pending approval')) {
+          return { 
+            success: false, 
+            message: 'Your account is pending approval by an administrator. Please check back later.'
+          };
+        }
+        return { 
+          success: false, 
+          message: 'Invalid username or password'
+        };
       }
     },
     
