@@ -8,3 +8,5 @@ python-multipart>=0.0.5,<0.0.6
 email-validator>=2.0.0
 pytest>=6.2.5,<7.0.0
 requests>=2.26.0,<3.0.0
+httpx>=0.24.0,<0.25.0  # Required for FastAPI TestClient
+gpxpy>=1.5.0  # Required for GPX file processing
