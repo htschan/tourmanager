@@ -40,7 +40,8 @@ from auth import (
     change_password
 )
 
-from routers.users import create_user, get_user_by_email
+from routers.users import create_user
+from auth import get_user_by_email
 
 app = FastAPI()
 
@@ -186,8 +187,34 @@ async def root():
     return {"message": "Tour Manager API is running", "version": "1.0.0"}
 
 @app.get("/health")
-async def health_check():
+async def health_check(db: Session = Depends(get_db)):
     """Health check endpoint for Docker"""
+    # Also print database information
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        users = db.query(UserModel).all()
+        user_info = []
+        for user in users:
+            user_info.append({
+                "id": user.id,
+                "username": user.username,
+                "hash_prefix": user.hashed_password[:15]
+            })
+        logger.error(f"USERS DB: {user_info}")
+        
+        # Check database file
+        import os
+        db_path = os.getenv("DATABASE_PATH", "unknown")
+        logger.error(f"DATABASE PATH: {db_path}")
+        if os.path.exists(db_path):
+            logger.error(f"DATABASE FILE EXISTS: Yes, size={os.path.getsize(db_path)}")
+        else:
+            logger.error(f"DATABASE FILE EXISTS: No")
+    except Exception as e:
+        logger.error(f"DATABASE ERROR: {str(e)}")
+    
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 @app.get("/api/tours", response_model=List[TourBase])
@@ -571,13 +598,65 @@ async def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
-    user = authenticate_user(db, form_data.username, form_data.password)
-    if not user:
+    # Add debug logging
+    print(f"Login attempt for user: {form_data.username}")
+    
+    # Get user from database directly to check password
+    import sqlite3
+    import os
+    from passlib.context import CryptContext
+    
+    # Setup password context
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    
+    # Get database path
+    if os.getenv("DOCKER_ENV") == "true":
+        db_path = "/app/data/tourmanager.db"
+    else:
+        db_path = "./tourmanager.db"
+    db_path = os.getenv("DATABASE_PATH", db_path)
+    
+    # Connect to database
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    # Check if user exists
+    cursor.execute("SELECT username, hashed_password FROM users WHERE username = ?", (form_data.username,))
+    user_data = cursor.fetchone()
+    conn.close()
+    
+    if not user_data:
+        print(f"User {form_data.username} not found")
         raise HTTPException(
             status_code=401,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    username, stored_hash = user_data
+    print(f"Found user {username} with hash: {stored_hash}")
+    
+    # Verify password
+    if not pwd_context.verify(form_data.password, stored_hash):
+        print(f"Password verification failed for {username}")
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+        
+    print(f"Password verification successful for {username}")
+    
+    # Get user from ORM
+    user = authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        print(f"ORM authentication failed for {username}")
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+        
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires
@@ -736,7 +815,88 @@ async def change_password_endpoint(
     current_user: UserModel = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    return await change_password(password_change, current_user, db)
+    try:
+        # Import directly here to avoid any circular import issues
+        from passlib.context import CryptContext
+        import sqlite3
+        import os
+        
+        # Setup password context
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        
+        # Check current password
+        if not pwd_context.verify(password_change.current_password, current_user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current password is incorrect"
+            )
+        
+        # Generate new hash
+        new_hash = pwd_context.hash(password_change.new_password)
+        
+        # Get database path from environment
+        if os.getenv("DOCKER_ENV") == "true":
+            db_path = "/app/data/tourmanager.db"
+        else:
+            db_path = "./tourmanager.db"
+        db_path = os.getenv("DATABASE_PATH", db_path)
+        
+        # Direct database access
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Update the password
+        cursor.execute("UPDATE users SET hashed_password = ? WHERE username = ?", 
+                     (new_hash, current_user.username))
+        rows_updated = cursor.rowcount
+        conn.commit()
+        
+        # Verify it worked
+        cursor.execute("SELECT hashed_password FROM users WHERE username = ?", (current_user.username,))
+        stored_hash = cursor.fetchone()[0]
+        conn.close()
+        
+        # Also update in memory
+        current_user.hashed_password = new_hash
+        
+        # Log results
+        print(f"Updated password for {current_user.username}. Rows updated: {rows_updated}")
+        print(f"New hash matches stored hash: {stored_hash == new_hash}")
+        
+        return {"message": "Password updated successfully"}
+    except Exception as e:
+        import traceback
+        traceback_text = traceback.format_exc()
+        print(f"Error changing password: {str(e)}")
+        print(traceback_text)
+        with open("/app/data/error_log.txt", "a") as f:
+            f.write(f"ERROR: {str(e)}\n")
+            f.write(traceback_text)
+            f.write("\n" + "-"*50 + "\n")
+        raise
+
+# Test endpoint to check users
+@app.get("/api/test/users")
+async def test_users(db: Session = Depends(get_db)):
+    import logging
+    logger = logging.getLogger("main")
+    
+    try:
+        users = db.query(UserModel).all()
+        result = []
+        for user in users:
+            result.append({
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "hashed_password": user.hashed_password[:10] + "...",
+            })
+        logger.error(f"TOTAL USERS: {len(result)}")
+        logger.error(f"USERS: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"ERROR: {str(e)}")
+        return {"error": str(e)}
 
 # Protect your existing endpoints with authentication
 # Example:

@@ -104,10 +104,7 @@ async function handleSubmit() {
     if (result.success) {
       success.value = true
       message.value = result.message
-      toastStore.show({
-        message: 'Password changed successfully',
-        type: 'success'
-      })
+      toastStore.success('Password changed successfully')
       // Reset form
       form.value = {
         currentPassword: '',
@@ -117,18 +114,12 @@ async function handleSubmit() {
     } else {
       success.value = false
       message.value = result.message
-      toastStore.show({
-        message: result.message,
-        type: 'error'
-      })
+      toastStore.error(result.message)
     }
   } catch (error) {
     success.value = false
     message.value = 'An error occurred while changing password'
-    toastStore.show({
-      message: 'Failed to change password',
-      type: 'error'
-    })
+    toastStore.error('Failed to change password')
   } finally {
     loading.value = false
   }

@@ -15,7 +15,7 @@ import os
 import logging
 
 # Setup logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # JWT configuration
@@ -66,6 +66,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 def get_user(db: Session, username: str):
     return db.query(UserModel).filter(UserModel.username == username).first()
+
+def get_user_by_email(db: Session, email: str):
+    return db.query(UserModel).filter(UserModel.email == email).first()
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
@@ -151,6 +154,83 @@ async def change_password(password_change: PasswordChangeRequest, user: UserMode
             detail="Current password is incorrect"
         )
     
-    user.hashed_password = get_password_hash(password_change.new_password)
-    db.commit()
-    return {"message": "Password updated successfully"}
+    logger.info(f"Changing password for user: {user.username}")
+    
+    try:
+        # Generate new password hash
+        new_hash = get_password_hash(password_change.new_password)
+        logger.info(f"New hash generated: {new_hash[:20]}...")
+        
+        # Use direct SQLite access for maximum reliability
+        import sqlite3
+        import os
+        
+        # Get database path from environment variables (same as in database.py)
+        ENV = os.getenv("ENV", "development")
+        if ENV == "test":
+            default_db_path = ":memory:"
+        elif os.getenv("DOCKER_ENV") == "true":
+            default_db_path = "/app/data/tourmanager.db"
+        else:
+            default_db_path = "./tourmanager.db"
+            
+        db_path = os.getenv("DATABASE_PATH", default_db_path)
+        logger.info(f"Using database path: {db_path}")
+        
+        # Connect directly to SQLite
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Update password
+        cursor.execute("UPDATE users SET hashed_password = ? WHERE username = ?", 
+                      (new_hash, user.username))
+        rows_affected = cursor.rowcount
+        logger.info(f"Rows affected by update: {rows_affected}")
+        
+        if rows_affected == 0:
+            logger.error(f"No rows updated for user {user.username}")
+            conn.close()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update password - user not found"
+            )
+        
+        # Commit changes
+        conn.commit()
+        
+        # Verify the update worked
+        cursor.execute("SELECT hashed_password FROM users WHERE username = ?", (user.username,))
+        updated_hash = cursor.fetchone()[0]
+        logger.info(f"Updated hash in database: {updated_hash[:20]}...")
+        
+        # Verify authentication works with new password
+        verification_result = verify_password(password_change.new_password, updated_hash)
+        logger.info(f"Password verification result: {verification_result}")
+        
+        if not verification_result:
+            logger.error("Password verification failed")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Password update succeeded but verification failed"
+            )
+        
+        conn.close()
+        
+        # Also update the user model in memory
+        user.hashed_password = new_hash
+        
+        return {"message": "Password updated successfully"}
+            
+    except Exception as e:
+        logger.error(f"Error changing password: {str(e)}")
+        try:
+            if 'conn' in locals() and conn:
+                conn.close()
+            if 'db' in locals() and db:
+                db.rollback()
+        except:
+            pass
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update password: {str(e)}"
+        )
