@@ -15,7 +15,7 @@ import logging
 import uvicorn
 
 # Configure logging
-logger = logging.getLogger(__name    # Username, hash, and status are extracted above
+logger = logging.getLogger(__name__)
     print(f"Found user {username} with hash: {stored_hash} and status: {user_status}")
     
     # Verify password
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name    # Username, hash, and status are extracted 
             status_code=401,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
-        }.setLevel(logging.INFO)
+        )
 handler = logging.StreamHandler()
 handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s | %(levelname)s: %(message)s')
