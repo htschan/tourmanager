@@ -16,16 +16,7 @@ import uvicorn
 
 # Configure logging
 logger = logging.getLogger(__name__)
-    print(f"Found user {username} with hash: {stored_hash} and status: {user_status}")
-    
-    # Verify password
-    if not pwd_context.verify(form_data.password, stored_hash):
-        print(f"Password verification failed for {username}")
-        raise HTTPException(
-            status_code=401,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+logger.setLevel(logging.INFO)
 handler = logging.StreamHandler()
 handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s | %(levelname)s: %(message)s')
@@ -644,6 +635,9 @@ async def login_for_access_token(
         
     username, stored_hash, user_status = user_data
     
+    # Print debug info
+    print(f"Found user {username} with hash: {stored_hash} and status: {user_status}")
+    
     # Check if user is pending approval
     if user_status == UserStatus.PENDING.value:
         print(f"User {form_data.username} is pending approval")
@@ -652,9 +646,6 @@ async def login_for_access_token(
             detail="Your account is pending approval by an administrator",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    username, stored_hash = user_data
-    print(f"Found user {username} with hash: {stored_hash}")
     
     # Verify password
     if not pwd_context.verify(form_data.password, stored_hash):
