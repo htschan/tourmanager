@@ -1062,6 +1062,7 @@ async def upload_multiple_gpx_files(
                 "/app/scripts",  # Docker container standard path
                 os.path.abspath("scripts"),  # Relative to current directory
                 os.path.abspath("../scripts"),  # One level up
+                os.path.abspath("./"),  # base level
             ]
             
             # Log debugging information
