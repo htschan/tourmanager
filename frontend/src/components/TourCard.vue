@@ -39,9 +39,14 @@
         <div class="tour-date">
           📅 {{ formatDate(tour.date) }}
         </div>
-        <router-link :to="`/tour/${tour.id}`" class="btn btn-primary btn-sm">
-          Details →
-        </router-link>
+        <div class="tour-actions">
+          <button @click.stop="navigateToMap" class="btn btn-map btn-sm">
+            🗺️ Karte
+          </button>
+          <router-link :to="`/tour/${tour.id}`" class="btn btn-primary btn-sm">
+            Details →
+          </router-link>
+        </div>
       </div>
     </div>
 
@@ -58,6 +63,9 @@
           </div>
         </div>
         <div class="list-actions">
+          <button @click.stop="navigateToMap" class="btn btn-map btn-sm">
+            🗺️ Karte
+          </button>
           <router-link :to="`/tour/${tour.id}`" class="btn btn-primary btn-sm">
             Details
           </router-link>
@@ -135,6 +143,11 @@ const formatDate = (dateString) => {
   } catch {
     return dateString
   }
+}
+
+// Navigate directly to tour detail page map section
+const navigateToMap = () => {
+  router.push(`/tour/${tour.id}#map`)
 }
 </script>
 
@@ -371,5 +384,24 @@ const formatDate = (dateString) => {
 
 .tour-card-list:hover {
   transform: none;
+}
+
+.tour-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-map {
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-map:hover {
+  background-color: #45a049;
 }
 </style>
