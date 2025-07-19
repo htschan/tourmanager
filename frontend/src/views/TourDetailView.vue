@@ -58,10 +58,18 @@ const tourMapElement = ref(null) Tour-Details...</p>
       <section id="map" class="tour-map-container" ref="mapContainer">
         <h2>Streckenverlauf</h2>
         <!-- Add a debug element to verify rendering -->
-        <div id="map-debug">Map container rendered</div>
+        <div id="map-debug" style="padding: 5px; background-color: #f8f8f8; border: 1px solid #ddd; margin-bottom: 10px;">
+          Map container rendered at {{ new Date().toISOString() }}
+        </div>
         <div class="map-wrapper">
-          <!-- Always render map container with explicit ID -->
-          <div id="tour-map" ref="tourMapElement" class="tour-map" style="height: 400px; width: 100%;"></div>
+          <!-- Always render map container with explicit ID and key for proper rerendering -->
+          <div 
+            id="tour-map" 
+            ref="tourMapElement" 
+            :key="`tour-map-${tour?.id || 'default'}`"
+            class="tour-map" 
+            style="height: 400px; width: 100%; border: 2px solid #ccc;"
+          ></div>
           <!-- Show message as overlay if no data -->
           <div v-if="tour && !tour.track_geojson" class="no-map-data">
             Keine Geodaten für diese Tour verfügbar
@@ -165,6 +173,7 @@ import 'leaflet/dist/leaflet.css'
 // Map reference
 const map = ref(null)
 const mapContainer = ref(null)
+const tourMapElement = ref(null)
 
 // Stores
 const tourStore = useTourStore()
@@ -294,37 +303,64 @@ const initMap = async () => {
   // Wait for the component to render completely
   await nextTick()
   
-  // Get the map container using the Vue ref first, then fallback to getElementById
-  const mapElement = mapContainer.value || document.getElementById('map')
-  let mapDiv = document.getElementById('tour-map')
+  // More robust approach to getting the map container
+  let mapDiv = null;
   
-  if (!mapDiv) {
-    console.log('Map container not found via ID, trying ref...')
-    if (tourMapElement.value) {
-      console.log('Found map container via ref')
-      mapDiv = tourMapElement.value
-    } else {
-      console.error('Map container not found, creating fallback container')
-      // Create a fallback container as a last resort
-      const mapWrapper = document.querySelector('.map-wrapper')
-      if (mapWrapper) {
-        mapDiv = document.createElement('div')
-        mapDiv.id = 'tour-map'
-        mapDiv.className = 'tour-map'
-        mapDiv.style.height = '400px'
-        mapDiv.style.width = '100%'
-        mapWrapper.appendChild(mapDiv)
-        console.log('Created fallback map container')
-      } else {
-        console.error('Map wrapper not found')
-        toastStore.error('Karte kann nicht angezeigt werden')
-        return
+  try {
+    // Try using the ref if available (using optional chaining to avoid errors)
+    if (tourMapElement?.value) {
+      console.log('Found map container via tourMapElement ref')
+      mapDiv = tourMapElement.value;
+    } 
+    // Next try by ID
+    else if (document.getElementById('tour-map')) {
+      console.log('Found map container via getElementById')
+      mapDiv = document.getElementById('tour-map');
+    } 
+    // Try another selector as fallback
+    else {
+      console.log('Trying alternative selector for map container')
+      mapDiv = document.querySelector('.tour-map');
+      
+      if (!mapDiv) {
+        console.error('Map container not found, creating fallback container')
+        // Create a fallback container as a last resort
+        const mapWrapper = document.querySelector('.map-wrapper')
+        if (mapWrapper) {
+          mapDiv = document.createElement('div')
+          mapDiv.id = 'tour-map'
+          mapDiv.className = 'tour-map'
+          mapDiv.style.height = '400px'
+          mapDiv.style.width = '100%'
+          mapWrapper.appendChild(mapDiv)
+          console.log('Created fallback map container')
+        } else {
+          console.error('Map wrapper not found')
+          toastStore.error('Karte kann nicht angezeigt werden')
+          return
+        }
       }
     }
+    
+    if (!mapDiv) {
+      throw new Error('Map container not available after all attempts');
+    }
+  } catch (error) {
+    console.error('Error finding map container:', error);
+    toastStore.error('Fehler beim Laden der Karte: Container nicht gefunden');
+    return;
   }
 
   console.log('Creating new map instance')
   try {
+    // Add detailed debug info
+    console.log('Map div details:', {
+      id: mapDiv.id,
+      className: mapDiv.className,
+      isConnected: mapDiv.isConnected,
+      parentElement: mapDiv.parentElement ? mapDiv.parentElement.tagName : 'none'
+    })
+    
     // Create a fresh map instance - use the element directly instead of the ID
     map.value = L.map(mapDiv, {
       zoomControl: true,
@@ -504,14 +540,41 @@ onMounted(async () => {
   // Use nextTick to ensure DOM is updated
   await nextTick()
   
-  // Defer map initialization with a longer timeout to ensure DOM is fully rendered
-  setTimeout(async () => {
-    if (tour.value?.track_geojson) {
-      console.log('Initializing map after timeout')
-      await initMap()
+  // Multiple attempts with increasing timeouts to ensure map renders correctly
+  // This addresses potential timing issues in different environments
+  const attemptMapInitialization = async (attempt = 1, maxAttempts = 3) => {
+    if (attempt > maxAttempts) {
+      console.error(`Failed to initialize map after ${maxAttempts} attempts`)
+      toastStore.error('Karte konnte nicht initialisiert werden')
+      return
     }
-    scrollToMapIfNeeded()
-  }, 1000)
+    
+    if (tour.value?.track_geojson) {
+      console.log(`Initializing map attempt ${attempt}/${maxAttempts}`)
+      try {
+        await initMap()
+        console.log('Map initialization successful')
+        scrollToMapIfNeeded()
+      } catch (error) {
+        console.warn(`Map initialization attempt ${attempt} failed:`, error)
+        // Exponential backoff for retries (500ms, 1000ms, 2000ms)
+        const timeout = Math.pow(2, attempt - 1) * 500
+        setTimeout(() => attemptMapInitialization(attempt + 1, maxAttempts), timeout)
+      }
+    }
+  }
+  
+  // Start the initialization attempts
+  attemptMapInitialization()
+})
+
+// Watch for changes to the tour data and reinitialize map when it changes
+watch(() => tour.value?.id, async (newVal, oldVal) => {
+  if (newVal && newVal !== oldVal) {
+    console.log('Tour data changed, reinitializing map')
+    await nextTick()
+    await initMap()
+  }
 })
 </script>
 
