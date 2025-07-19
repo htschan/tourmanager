@@ -7,7 +7,16 @@ from sqlalchemy import create_engine, text
 
 # --- Konfiguration ---
 GPX_FOLDER = '../touren'  # <-- HIER DEINEN PFAD EINFÜGEN
-DATABASE_FILE = 'tourmanager.db'
+
+# Set default database path based on environment
+if os.getenv("DOCKER_ENV") == "true":
+    DATABASE_FILE = "/app/data/tourmanager.db"
+else:
+    DATABASE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tourmanager.db')
+
+# Allow override via environment variable
+DATABASE_FILE = os.getenv("DATABASE_PATH", DATABASE_FILE)
+
 engine = create_engine(f'sqlite:///{DATABASE_FILE}')
 
 def parse_and_store_gpx(file_path):
@@ -116,7 +125,7 @@ def parse_and_store_gpx(file_path):
     })
     
     # In die Datenbank schreiben
-    with engine.connect() as connection:
+    with engine.begin() as connection:
         stmt = text("""
             INSERT INTO tours (name, type, date, distance_km, duration_s, start_lat, start_lon, track_geojson, komootid, komoothref, ebike, speed_kmh, elevation_up, elevation_down)
             VALUES (:name, :type, :date, :distance, :duration, :start_lat, :start_lon, :track_geojson, :komootid, :komoothref, :ebike, :speed_kmh, :elevation_up, :elevation_down)
@@ -137,13 +146,13 @@ def parse_and_store_gpx(file_path):
             "elevation_up": round(elevation_up, 2),
             "elevation_down": round(elevation_down, 2)
         })
-        connection.commit()
+        # connection.commit() -- not needed with begin()
     
     return "imported"
 
 if __name__ == '__main__':
     # Initialisiere die Datenbank-Tabelle, falls sie nicht existiert
-    with engine.connect() as connection:
+    with engine.begin() as connection:
         connection.execute(text("""
             CREATE TABLE IF NOT EXISTS tours (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -169,7 +178,7 @@ if __name__ == '__main__':
             CREATE INDEX IF NOT EXISTS idx_komootid ON tours(komootid);
         """))
         
-        connection.commit()
+        # connection.commit() -- not needed with begin()
 
     # Alle GPX-Dateien im Ordner verarbeiten
     imported_count = 0

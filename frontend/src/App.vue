@@ -12,11 +12,17 @@
             <router-link to="/" class="nav-link" @click="closeMenu">
               🏠 Home
             </router-link>
+            <router-link to="/tours" class="nav-link" @click="closeMenu">
+              🚲 Touren
+            </router-link>
             <router-link to="/map" class="nav-link" @click="closeMenu">
               🗺️ Karte
             </router-link>
             <router-link to="/statistics" class="nav-link" @click="closeMenu">
               📊 Statistiken
+            </router-link>
+            <router-link to="/upload" class="nav-link" @click="closeMenu">
+              📤 Upload
             </router-link>
             <router-link to="/profile" class="nav-link" @click="closeMenu">
               👤 Profile
