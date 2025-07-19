@@ -82,6 +82,43 @@ export const tourApi = {
     console.log('🔧 API getToursGeoJSON - params received:', params)
     console.log('🔧 API getToursGeoJSON - calling:', '/api/tours/geojson', { params })
     return api.get('/api/tours/geojson', { params })
+  },
+  
+  // Debug a specific tour's GeoJSON data
+  debugTourGeoJSON: (tourId) => {
+    return api.get(`/api/debug/tours/${tourId}`)
+  },
+  
+  // Upload a GPX file
+  uploadGpxFile: (file, onUploadProgress) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    const config = {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      },
+      onUploadProgress
+    }
+    
+    return api.post('/api/tours/upload', formData, config)
+  },
+  
+  // Upload multiple GPX files
+  uploadMultipleGpxFiles: (files, onUploadProgress) => {
+    const formData = new FormData()
+    files.forEach(file => {
+      formData.append('files', file)
+    })
+    
+    const config = {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      },
+      onUploadProgress
+    }
+    
+    return api.post('/api/tours/upload/batch', formData, config)
   }
 }
 

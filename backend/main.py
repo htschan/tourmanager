@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query, Depends, Request, status
+from fastapi import FastAPI, HTTPException, Query, Depends, Request, status, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -11,7 +11,9 @@ from pydantic import BaseModel
 import json
 import math
 import os
+import sys
 import logging
+import tempfile
 import uvicorn
 
 # Configure logging
@@ -908,6 +910,236 @@ async def test_users(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"ERROR: {str(e)}")
         return {"error": str(e)}
+
+# --- GPX Upload Functionality ---
+@app.post("/api/tours/upload")
+async def upload_gpx_file(
+    file: UploadFile = File(...),
+    current_user: UserModel = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload a GPX file to add a new tour
+    """
+    # Check if user is authorized
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can upload GPX files"
+        )
+    
+    # Check if the file is a GPX file
+    if not file.filename.lower().endswith('.gpx'):
+        raise HTTPException(
+            status_code=400,
+            detail="Only GPX files are accepted"
+        )
+    
+    try:
+        # Create a temporary file to store the uploaded GPX file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.gpx') as temp_file:
+            contents = await file.read()
+            temp_file.write(contents)
+            temp_file_path = temp_file.name
+        
+        # Import the GPX processing function from our script
+        import sys
+        import os
+        import importlib.util
+        
+        # Try several possible script paths
+        possible_script_paths = [
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "../scripts"),  # Development environment
+            "/app/scripts",  # Docker container standard path
+            os.path.abspath("scripts"),  # Relative to current directory
+            os.path.abspath("../scripts"),  # One level up
+        ]
+        
+        # Log debugging information
+        logger.error(f"Current working directory: {os.getcwd()}")
+        logger.error(f"Searching for import_gpx.py in these directories: {possible_script_paths}")
+        
+        # Search for the script in all possible locations
+        import_gpx_path = None
+        for path in possible_script_paths:
+            script_path = os.path.join(path, "import_gpx.py")
+            if os.path.exists(script_path):
+                import_gpx_path = script_path
+                logger.error(f"Found script at: {import_gpx_path}")
+                break
+            else:
+                if os.path.exists(path):
+                    logger.error(f"Directory exists but script not found. Files in {path}: {os.listdir(path)}")
+                else:
+                    logger.error(f"Directory does not exist: {path}")
+        
+        if not import_gpx_path:
+            logger.error("import_gpx.py not found in any of the expected locations")
+            raise FileNotFoundError("GPX import script not found in any of the expected locations")
+            
+        # Add all possible paths to sys.path
+        for path in possible_script_paths:
+            if path not in sys.path and os.path.exists(path):
+                sys.path.append(path)
+            
+        # All potential directories were already added to sys.path in the code above
+        
+        # Import module using spec
+        spec = importlib.util.spec_from_file_location("import_gpx", import_gpx_path)
+        import_gpx = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(import_gpx)
+        
+        # Access the function
+        parse_and_store_gpx = import_gpx.parse_and_store_gpx
+        
+        # Process the GPX file
+        result = parse_and_store_gpx(temp_file_path)
+        
+        # Clean up the temporary file
+        os.unlink(temp_file_path)
+        
+        # Return appropriate response based on the result
+        if result == "imported":
+            return {"status": "success", "message": "Tour imported successfully"}
+        elif result == "exists":
+            return {"status": "warning", "message": "Tour already exists (same Komoot ID)"}
+        elif result == "skipped":
+            return {"status": "warning", "message": "Tour skipped - no track points found"}
+        else:
+            return {"status": "error", "message": f"Unknown error: {result}"}
+            
+    except Exception as e:
+        logger.error(f"Error processing GPX file: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing GPX file: {str(e)}"
+        )
+
+# Batch upload endpoint for multiple files
+@app.post("/api/tours/upload/batch")
+async def upload_multiple_gpx_files(
+    files: list[UploadFile] = File(...),
+    current_user: UserModel = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload multiple GPX files at once
+    """
+    # Check if user is authorized
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can upload GPX files"
+        )
+    
+    results = []
+    
+    for file in files:
+        # Check if the file is a GPX file
+        if not file.filename.lower().endswith('.gpx'):
+            results.append({
+                "filename": file.filename,
+                "status": "error",
+                "message": "Not a GPX file"
+            })
+            continue
+        
+        try:
+            # Create a temporary file to store the uploaded GPX file
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.gpx') as temp_file:
+                contents = await file.read()
+                temp_file.write(contents)
+                temp_file_path = temp_file.name
+            
+            # Import the GPX processing function from our script
+            import sys
+            import os
+            import importlib.util
+            
+            # Try several possible script paths
+            possible_script_paths = [
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), "../scripts"),  # Development environment
+                "/app/scripts",  # Docker container standard path
+                os.path.abspath("scripts"),  # Relative to current directory
+                os.path.abspath("../scripts"),  # One level up
+            ]
+            
+            # Log debugging information
+            logger.error(f"Batch upload - Current working directory: {os.getcwd()}")
+            logger.error(f"Batch upload - Searching for import_gpx.py in these directories: {possible_script_paths}")
+            
+            # Search for the script in all possible locations
+            import_gpx_path = None
+            for path in possible_script_paths:
+                script_path = os.path.join(path, "import_gpx.py")
+                if os.path.exists(script_path):
+                    import_gpx_path = script_path
+                    logger.error(f"Batch upload - Found script at: {import_gpx_path}")
+                    break
+                else:
+                    if os.path.exists(path):
+                        logger.error(f"Batch upload - Directory exists but script not found. Files in {path}: {os.listdir(path)}")
+                    else:
+                        logger.error(f"Batch upload - Directory does not exist: {path}")
+            
+            if not import_gpx_path:
+                logger.error("Batch upload - import_gpx.py not found in any of the expected locations")
+                raise FileNotFoundError("Batch upload - GPX import script not found in any of the expected locations")
+                
+            # Add all possible paths to sys.path
+            for path in possible_script_paths:
+                if path not in sys.path and os.path.exists(path):
+                    sys.path.append(path)
+            
+            # Import module using spec
+            spec = importlib.util.spec_from_file_location("import_gpx", import_gpx_path)
+            import_gpx = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(import_gpx)
+            
+            # Access the function
+            parse_and_store_gpx = import_gpx.parse_and_store_gpx
+            
+            # Process the GPX file
+            result = parse_and_store_gpx(temp_file_path)
+            
+            # Clean up the temporary file
+            os.unlink(temp_file_path)
+            
+            # Add result to the results list
+            if result == "imported":
+                results.append({
+                    "filename": file.filename,
+                    "status": "success",
+                    "message": "Tour imported successfully"
+                })
+            elif result == "exists":
+                results.append({
+                    "filename": file.filename,
+                    "status": "warning",
+                    "message": "Tour already exists (same Komoot ID)"
+                })
+            elif result == "skipped":
+                results.append({
+                    "filename": file.filename,
+                    "status": "warning",
+                    "message": "Tour skipped - no track points found"
+                })
+            else:
+                results.append({
+                    "filename": file.filename,
+                    "status": "error",
+                    "message": f"Unknown error: {result}"
+                })
+                
+        except Exception as e:
+            logger.error(f"Error processing GPX file {file.filename}: {str(e)}")
+            results.append({
+                "filename": file.filename,
+                "status": "error",
+                "message": f"Error processing file: {str(e)}"
+            })
+    
+    return {"results": results}
 
 # Protect your existing endpoints with authentication
 # Example:

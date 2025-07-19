@@ -6,8 +6,14 @@
         <h1>🚴 Tour Manager</h1>
         <p>Verwalte und visualisiere deine GPX-Touren</p>
         <div class="hero-actions">
+          <router-link to="/tours" class="btn btn-primary">
+            🚲 Alle Touren anzeigen
+          </router-link>
           <router-link to="/map" class="btn btn-primary">
             🗺️ Karte öffnen
+          </router-link>
+          <router-link to="/upload" class="btn btn-primary">
+            📤 Tour hochladen
           </router-link>
           <button @click="findNearbyTours" class="btn btn-secondary" :disabled="loadingLocation">
             📍 Touren in der Nähe

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Test Uploader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.topografix.com/GPX/1/1" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata>
+    <name>Test Tour Upload 2</name>
+    <time>2025-07-19T11:45:00Z</time>
+  </metadata>
+  <trk>
+    <name>Test Tour Upload 2</name>
+    <type>Bike</type>
+    <link href="https://www.komoot.de/tour/987654321">
+      <text>Test Tour on Komoot</text>
+    </link>
+    <trkseg>
+      <trkpt lat="47.3769" lon="8.5417">
+        <ele>409</ele>
+        <time>2025-07-19T11:45:00Z</time>
+      </trkpt>
+      <trkpt lat="47.3770" lon="8.5418">
+        <ele>410</ele>
+        <time>2025-07-19T11:45:30Z</time>
+      </trkpt>
+      <trkpt lat="47.3771" lon="8.5419">
+        <ele>411</ele>
+        <time>2025-07-19T11:46:00Z</time>
+      </trkpt>
+      <trkpt lat="47.3772" lon="8.5420">
+        <ele>412</ele>
+        <time>2025-07-19T11:46:30Z</time>
+      </trkpt>
+      <trkpt lat="47.3773" lon="8.5421">
+        <ele>413</ele>
+        <time>2025-07-19T11:47:00Z</time>
+      </trkpt>
+      <trkpt lat="47.3774" lon="8.5422">
+        <ele>414</ele>
+        <time>2025-07-19T11:47:30Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>
