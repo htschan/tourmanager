@@ -4,7 +4,7 @@
 
 Eine vollständige Webapplikation zur Verwaltung und Visualisierung von GPX-Touren.
 
-Das Projekt wurde kreiert durch Github Copilot mit dem Claude Sonnet 3.5 Model im Agent-Modus.
+Das Projekt wurde kreiert durch Github Copilot mit dem Claude Sonnet 3.7 Model im Agent-Modus.
 
 ## Komoot
 
@@ -36,7 +36,11 @@ tour-manager/
 docker compose up --build
 
 # Backend: http://localhost:8000
-# Frontend: http://localhost:3001
+# Frontend: http://localhost:3000
+
+# Karten-Funktionalität testen
+cd scripts
+./test_map.sh
 ```
 
 ### Manuell
@@ -79,6 +83,7 @@ npm run dev
 - 🏗️ **Build Info** (Timestamp & Git SHA)
 - 🐞 **Debug Panel** für Entwicklung
 - 🔄 **Automatische Aktualisierung** der Tour-Daten
+- 🗺️ **Multi-Layer Karten** (aktuelle Tour + alle anderen Touren)
 
 ### GPX Import System
 - 📥 **Batch-Import** aller GPX-Dateien
@@ -150,12 +155,15 @@ secrets:
 ## 🗺️ Karten-Features
 
 - **Tour-Routen Visualisierung** mit farbkodierten Linien
+- **Überlagerte GeoJSON-Daten** für alle Touren auf einer Karte
 - **Standort-basierte Suche** in konfigurierbarem Radius
 - **Interactive Tooltips** mit Tour-Informationen
 - **Vollbild-Modus** für detaillierte Ansicht
 - **Touch-optimierte Bedienung** für Mobile
 - **Clustering** für bessere Performance
 - **Debug-Overlay** für Entwicklung
+- **Interaktive Legende** zur Unterscheidung von aktueller Tour und anderen Touren
+- **Start-/Endpunkt Markierungen** für Tour-Navigation
 
 ## 🔐 Authentifizierung & Datenbank
 
@@ -200,6 +208,27 @@ npm install
 npm run dev
 ```
 
+### Karten-Debugging
+```bash
+# Test-Skript für Karten-Rendering ausführen
+cd scripts
+./test_map.sh
+
+# Zugriff auf die Tour-Detail-Ansicht mit Map
+http://localhost:3000/tours/<tour_id>
+
+# Überprüfen der GeoJSON-Endpunkte
+curl -s http://localhost:8000/api/tours/geojson | head
+
+# Prüfen ob Map-Container korrekt initialisiert wird
+# (Browser-Konsole auf Fehler prüfen)
+```
+
+Das neue Test-Skript `scripts/test_map.sh` bietet eine automatisierte Prüfung der Karten-Funktionalität:
+- Findet eine Test-Tour aus der Datenbank
+- Prüft die API-Endpunkte auf korrekte Antworten
+- Gibt Links zum manuellen Testen im Browser
+
 ### GPX Import
 ```bash
 cd scripts
@@ -223,7 +252,29 @@ Die Frontend-App kann als PWA auf jedem Gerät installiert werden:
 - **Mobile**: "Zum Homescreen hinzufügen"
 - **Offline-Unterstützung** für Karten und Daten
 
-## 🔧 Konfiguration
+## � Fehlerbehandlung & Troubleshooting
+
+### Karten-Rendering Probleme
+- **Problem**: "Map container not found" Fehler in der Konsole
+- **Lösung**: 
+  1. Stellen Sie sicher, dass der DOM vollständig geladen ist (`nextTick()`)
+  2. Verwenden Sie Vue refs für den Kartenbehälter
+  3. Erhöhen Sie die Wartezeit vor der Karten-Initialisierung
+
+### GeoJSON Daten werden nicht angezeigt
+- **Problem**: Karte ist sichtbar, aber keine Tour-Daten werden gerendert
+- **Lösung**:
+  1. Überprüfen Sie die GeoJSON-Endpunkte mit `curl http://localhost:8000/api/tours/geojson`
+  2. Stellen Sie sicher, dass die Tour track_geojson-Daten enthält
+  3. Prüfen Sie die Konsole auf Leaflet-bezogene Fehler
+
+### Frontend-Container Neustart
+- Bei Änderungen am Frontend-Code den Container neu starten:
+  ```bash
+  docker compose up -d --build frontend
+  ```
+
+## �🔧 Konfiguration
 
 ### Environment Variables
 ```bash
@@ -262,9 +313,35 @@ services:
 - [ ] **Social Features** (Teilen, Bewertungen)
 - [x] **Erweiterte Statistiken** (Build Info, Deploy Info)
 - [x] **Dark/Light Mode**
+- [x] **Verbesserte Karten-Darstellung** (Overlay aller Touren als GeoJSON)
 - [ ] **Export-Funktionen** (GPX, PDF Reports)
 - [ ] **CI/CD Pipeline Verbesserungen**
 - [ ] **Test Coverage Erhöhung**
+
+## 📚 API Referenz
+
+### Karten-bezogene Endpunkte
+
+#### GeoJSON für alle Touren
+```
+GET /api/tours/geojson
+```
+Liefert alle Touren als GeoJSON FeatureCollection für die Kartendarstellung.
+
+**Parameter:**
+- `tour_type` (optional): Filtert nach Tour-Typ (z.B. "Wanderung", "Fahrradtour")
+- `date_from` (optional): Startdatum im Format YYYY-MM-DD
+- `date_to` (optional): Enddatum im Format YYYY-MM-DD
+- `limit` (optional): Maximale Anzahl zurückgelieferter Touren (Default: 999999)
+
+#### Debug-Endpunkt für Tour-GeoJSON
+```
+GET /api/debug/tours/{tour_id}
+```
+Debug-Endpunkt zum Prüfen der GeoJSON-Daten einer spezifischen Tour.
+
+**Parameter:**
+- `tour_id`: ID der zu debuggenden Tour
 
 ## 🤝 Contributing
 

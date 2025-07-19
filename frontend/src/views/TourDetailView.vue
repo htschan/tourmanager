@@ -3,14 +3,33 @@
     <!-- Loading State -->
     <div v-if="loading" class="loading-container">
       <div class="spinner"></div>
-      <p>Lade Tour-Details...</p>
+      <p>L# Map references
+const map = ref(null)
+const mapContainer = ref(null)
+const tourMapElement = ref(null) Tour-Details...</p>
     </div>
 
     <!-- Error State -->
     <div v-else-if="error" class="error-container">
       <h2>Fehler beim Laden der Tour</h2>
       <p>{{ error }}</p>
-      <button @click="loadTourData" class="btn btn-primary">Erneut versuchen</button>
+      <button @click="loadTourData" class="btn btn-primary">Erneu      // Start m      // Start marker (green circle)
+      L.marker([startCoords[1], startCoords[0]], {
+        icon: L.divIcon({
+          html: '<div style="display:flex;align-items:center;justify-content:center;background:#ffffff;border-radius:50%;width:30px;height:30px;box-shadow:0 1px 3px rgba(0,0,0,0.3);"><span style="font-size:20px;">🟢</span></div>',
+          iconSize: [30, 30],
+          className: 'start-marker-icon'
+        }),
+        title: 'Start der Tour'
+      }).addTo(map.value);reen circle)
+      L.marker([startCoords[1], startCoords[0]], {
+        icon: L.divIcon({
+          html: '<div style="display:flex;align-items:center;justify-content:center;background:#ffffff;border-radius:50%;width:30px;height:30px;box-shadow:0 1px 3px rgba(0,0,0,0.3);"><span style="font-size:20px;">🟢</span></div>',
+          iconSize: [30, 30],
+          className: 'start-marker-icon'
+        }),
+        title: 'Start der Tour'
+      }).addTo(map.value);hen</button>
       <router-link to="/" class="btn btn-secondary">Zurück zur Übersicht</router-link>
     </div>
 
@@ -36,12 +55,26 @@
       </header>
 
       <!-- Tour Map -->
-      <section class="tour-map-container" ref="mapContainer">
+      <section id="map" class="tour-map-container" ref="mapContainer">
         <h2>Streckenverlauf</h2>
+        <!-- Add a debug element to verify rendering -->
+        <div id="map-debug">Map container rendered</div>
         <div class="map-wrapper">
-          <div id="tour-map" class="tour-map"></div>
-          <div v-if="!tour.track_geojson" class="no-map-data">
+          <!-- Always render map container with explicit ID -->
+          <div id="tour-map" ref="tourMapElement" class="tour-map" style="height: 400px; width: 100%;"></div>
+          <!-- Show message as overlay if no data -->
+          <div v-if="tour && !tour.track_geojson" class="no-map-data">
             Keine Geodaten für diese Tour verfügbar
+          </div>
+          <div class="map-legend">
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: #3388ff; height: 5px;"></div>
+              <span>Aktuelle Tour</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: #888888; height: 2px;"></div>
+              <span>Andere Touren</span>
+            </div>
           </div>
         </div>
       </section>
@@ -115,17 +148,19 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, watch, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { useTourStore } from '../stores/tours'
 import { useToastStore } from '../stores/toast'
+import { tourApi } from '../services/api'
 import TourCard from '../components/TourCard.vue'
 
-// Initialize Leaflet in a way that works with Vite
-let L
+// Import Leaflet directly instead of dynamic import
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 
 // Map reference
 const map = ref(null)
@@ -150,6 +185,21 @@ watch(
   (newId) => {
     if (newId) {
       loadTourData()
+    }
+  }
+)
+
+// Watch for tour data changes to initialize map
+watch(
+  () => tour.value,
+  async (newTour) => {
+    if (newTour?.track_geojson) {
+      // Give DOM time to update
+      await nextTick()
+      setTimeout(async () => {
+        console.log('Tour data changed, reinitializing map')
+        await initMap()
+      }, 500)
     }
   }
 )
@@ -203,11 +253,6 @@ const loadTourData = async () => {
     // After getting the tour, load nearby tours based on start location
     if (tour.value) {
       loadNearbyTours()
-      
-      // Setup map after tour data is loaded
-      setTimeout(() => {
-        initMap()
-      }, 100)
     }
   } catch (err) {
     toastStore.error('Fehler beim Laden der Tour')
@@ -232,38 +277,163 @@ const loadNearbyTours = async () => {
 
 // Initialize map with tour data
 const initMap = async () => {
-  if (!tour.value?.track_geojson) return
-
-  // Dynamically import Leaflet
-  if (!L) {
-    const leaflet = await import('leaflet')
-    L = leaflet.default
-    
-    // Import CSS
-    const link = document.createElement('link')
-    link.rel = 'stylesheet'
-    link.href = 'https://unpkg.com/leaflet@1.7.1/dist/leaflet.css'
-    document.head.appendChild(link)
+  console.log('Initializing map...', tour.value?.id)
+  
+  if (!tour.value) {
+    console.warn('No tour data available')
+    return
+  }
+  
+  // Force clean up any existing map
+  if (map.value) {
+    console.log('Cleaning up existing map')
+    map.value.remove()
+    map.value = null
+  }
+  
+  // Wait for the component to render completely
+  await nextTick()
+  
+  // Get the map container using the Vue ref first, then fallback to getElementById
+  const mapElement = mapContainer.value || document.getElementById('map')
+  let mapDiv = document.getElementById('tour-map')
+  
+  if (!mapDiv) {
+    console.log('Map container not found via ID, trying ref...')
+    if (tourMapElement.value) {
+      console.log('Found map container via ref')
+      mapDiv = tourMapElement.value
+    } else {
+      console.error('Map container not found, creating fallback container')
+      // Create a fallback container as a last resort
+      const mapWrapper = document.querySelector('.map-wrapper')
+      if (mapWrapper) {
+        mapDiv = document.createElement('div')
+        mapDiv.id = 'tour-map'
+        mapDiv.className = 'tour-map'
+        mapDiv.style.height = '400px'
+        mapDiv.style.width = '100%'
+        mapWrapper.appendChild(mapDiv)
+        console.log('Created fallback map container')
+      } else {
+        console.error('Map wrapper not found')
+        toastStore.error('Karte kann nicht angezeigt werden')
+        return
+      }
+    }
   }
 
-  // Initialize map if container exists
-  const mapDiv = document.getElementById('tour-map')
-  if (!mapDiv) return
-
-  // Create map if it doesn't exist
-  if (!map.value) {
-    map.value = L.map('tour-map')
+  console.log('Creating new map instance')
+  try {
+    // Create a fresh map instance - use the element directly instead of the ID
+    map.value = L.map(mapDiv, {
+      zoomControl: true,
+      attributionControl: true
+    })
     
     // Add tile layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map.value)
+    
+    console.log('Map created successfully')
+  } catch (error) {
+    console.error('Error creating map:', error)
+    toastStore.error('Fehler beim Erstellen der Karte')
+    return
   }
 
-  // Add tour track to map
+  let currentTourLayer = null
+  let allToursLayer = null
+
+  // First, load all other tours to display as background
   try {
-    const trackData = tour.value.track_geojson
-    const geoJsonLayer = L.geoJSON(trackData, {
+    console.log('Loading all tours GeoJSON data')
+    const response = await tourApi.getToursGeoJSON()
+    const allToursGeoJSON = response.data
+    
+    // Add all tours layer with gray styling
+    allToursLayer = L.geoJSON(allToursGeoJSON, {
+      style: (feature) => {
+        // Style differently if it's the current tour
+        if (feature.properties.id === tour.value.id) {
+          return {
+            color: '#3388ff',
+            weight: 5,
+            opacity: 0.8
+          }
+        }
+        // Style for all other tours
+        return {
+          color: '#888888',
+          weight: 2,
+          opacity: 0.5
+        }
+      },
+      onEachFeature: (feature, layer) => {
+        // Add hover effect for other tours
+        if (feature.properties.id !== tour.value.id) {
+          layer.on({
+            mouseover: (e) => {
+              e.target.setStyle({
+                weight: 3,
+                opacity: 0.7,
+                color: '#aaaaaa'
+              })
+            },
+            mouseout: (e) => {
+              allToursLayer.resetStyle(e.target)
+            },
+            click: (e) => {
+              // Navigate to the clicked tour
+              if (feature.properties.id !== tour.value.id) {
+                router.push(`/tours/${feature.properties.id}`)
+              }
+            }
+          })
+        }
+      }
+    }).addTo(map.value)
+    
+    console.log('Added all tours layer to map')
+  } catch (error) {
+    console.error('Error loading all tours GeoJSON:', error)
+    // Continue with just the current tour
+  }
+
+  // Now add the current tour track to map with prominent styling
+  try {
+    if (!tour.value.track_geojson) {
+      console.warn('No track_geojson data available for current tour')
+      return
+    }
+    
+    // Handle track_geojson which might be a string or an object
+    let trackData = tour.value.track_geojson
+    
+    // If trackData is a string, try to parse it
+    if (typeof trackData === 'string') {
+      try {
+        console.log('Parsing track_geojson from string')
+        trackData = JSON.parse(trackData)
+      } catch (parseErr) {
+        console.error('Failed to parse track_geojson string:', parseErr)
+        throw new Error('Invalid GeoJSON data format')
+      }
+    }
+    
+    // Convert LineString to a proper GeoJSON feature object
+    const geoJsonFeature = {
+      type: "Feature",
+      properties: {
+        id: tour.value.id,
+        name: tour.value.name
+      },
+      geometry: trackData
+    }
+    
+    // Add current tour with prominent styling
+    currentTourLayer = L.geoJSON(geoJsonFeature, {
       style: {
         color: '#3388ff',
         weight: 5,
@@ -271,40 +441,77 @@ const initMap = async () => {
       }
     }).addTo(map.value)
 
-    // Fit map to track bounds
-    map.value.fitBounds(geoJsonLayer.getBounds())
+    console.log('Added current tour layer to map')
 
-    // Add start/end markers if coordinates exist
-    if (trackData.coordinates && trackData.coordinates.length > 0) {
-      // Start marker
-      const startCoords = trackData.coordinates[0]
+    // Fit map to current tour bounds
+    try {
+      const bounds = currentTourLayer.getBounds()
+      map.value.fitBounds(bounds)
+    } catch (boundsError) {
+      console.error('Error fitting map to bounds:', boundsError)
+      // Set a default view if bounds can't be determined
+      map.value.setView([tour.value.start_lat, tour.value.start_lon], 12)
+    }
+
+    // Add start/end markers with better styling
+    console.log('Adding start/end markers...');
+    if (trackData.coordinates && trackData.coordinates.length >= 2) {
+      const startCoords = trackData.coordinates[0];
+      const endCoords = trackData.coordinates[trackData.coordinates.length - 1];
+      
+      // Start marker (green circle)
       L.marker([startCoords[1], startCoords[0]], {
         icon: L.divIcon({
-          html: '🚩',
-          iconSize: [20, 20],
-          className: 'start-marker'
+          html: '<div style="display:flex;align-items:center;justify-content:center;background:#ffffff;border-radius:50%;width:30px;height:30px;box-shadow:0 1px 3px rgba(0,0,0,0.3);"><span style="font-size:16px;">�</span></div>',
+          iconSize: [30, 30],
+          className: 'start-marker-icon'
         })
-      }).addTo(map.value)
-
-      // End marker
-      const endCoords = trackData.coordinates[trackData.coordinates.length - 1]
+      }).addTo(map.value);
+      
+      // End marker (red circle)
       L.marker([endCoords[1], endCoords[0]], {
         icon: L.divIcon({
-          html: '🏁',
-          iconSize: [20, 20],
-          className: 'end-marker'
-        })
-      }).addTo(map.value)
+          html: '<div style="display:flex;align-items:center;justify-content:center;background:#ffffff;border-radius:50%;width:30px;height:30px;box-shadow:0 1px 3px rgba(0,0,0,0.3);"><span style="font-size:20px;">🔴</span></div>',
+          iconSize: [30, 30],
+          className: 'end-marker-icon'
+        }),
+        title: 'Ende der Tour'
+      }).addTo(map.value);
     }
   } catch (error) {
-    console.error('Error rendering map:', error)
+    console.error('Error rendering current tour map:', error)
     toastStore.error('Fehler beim Laden der Karte')
   }
 }
 
+// Scroll to map section if hash is present
+const scrollToMapIfNeeded = () => {
+  if (window.location.hash === '#map') {
+    setTimeout(() => {
+      const mapElement = document.getElementById('map')
+      if (mapElement) {
+        mapElement.scrollIntoView({ behavior: 'smooth' })
+      }
+    }, 1000) // Longer delay to ensure everything is rendered
+  }
+}
+
 // Lifecycle hooks
-onMounted(() => {
-  loadTourData()
+onMounted(async () => {
+  console.log('TourDetailView mounted, loading data')
+  await loadTourData()
+  
+  // Use nextTick to ensure DOM is updated
+  await nextTick()
+  
+  // Defer map initialization with a longer timeout to ensure DOM is fully rendered
+  setTimeout(async () => {
+    if (tour.value?.track_geojson) {
+      console.log('Initializing map after timeout')
+      await initMap()
+    }
+    scrollToMapIfNeeded()
+  }, 1000)
 })
 </script>
 
@@ -419,6 +626,9 @@ onMounted(() => {
 }
 
 .tour-map {
+  height: 400px !important;
+  width: 100% !important;
+  z-index: 1;
   height: 100%;
 }
 
@@ -431,9 +641,35 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f5f5f5;
-  font-weight: 500;
+  background-color: rgba(245, 245, 245, 0.8);
+  font-size: 1.1rem;
   color: #666;
+}
+
+.map-legend {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: 4px;
+  padding: 8px 12px;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.legend-item:last-child {
+  margin-bottom: 0;
+}
+
+.legend-color {
+  width: 30px;
+  margin-right: 8px;
 }
 
 .tour-stats {
