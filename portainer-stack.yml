@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/htschan/tourmanager/backend:latest}
+    ports:
+      - "8000:8000"
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 5    
+      volumes:
+      - tour-scripts:/app/scripts
+      - tour-scripts:/scripts  # Additional mounting point for scripts
+      - tour-data:/app/data
+    environment:
+      # Database configuration
+      - DATABASE_PATH=/app/data/tourmanager.db
+      
+      # Security
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secure-secret-key-here}
+      
+      # Email configuration
+      - MAIL_USERNAME=${MAIL_USERNAME:-your-email@example.com}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:-your-app-password}
+      - MAIL_FROM=${MAIL_FROM:-your-email@example.com}
+      - MAIL_SERVER=${MAIL_SERVER:-smtp.gmail.com}
+      - MAIL_PORT=${MAIL_PORT:-587}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      
+      # Runtime configuration
+      - DOCKER_ENV=true
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/htschan/tourmanager/frontend:latest}
+    ports:
+      - "3001:3000"
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 5
+    environment:
+      # Frontend runs in browser, so we need to use localhost or public domain
+      - VITE_API_BASE_URL=${API_BASE_URL:-http://localhost:8000}
+    depends_on:
+      - backend
+
+volumes:
+  tour-scripts:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${SCRIPT_VOLUME_PATH:-/path/to/scripts}
+  tour-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_VOLUME_PATH:-/path/to/data}
+
