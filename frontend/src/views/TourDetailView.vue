@@ -51,12 +51,14 @@ const tourMapElement = ref(null) Tour-Details...</p>
           </span>
           <span v-if="tour.ebike" class="ebike-badge">⚡ E-Bike</span>
           <span class="date-badge">📅 {{ formatDate(tour.date) }}</span>
+          <span class="distance-badge">📏 {{ formatDistance(tour.distance_km) }}</span>
         </div>
       </header>
 
       <!-- Tour Map -->
       <section id="map" class="tour-map-container" ref="mapContainer">
-        <h2>Streckenverlauf</h2>
+        <h2>Streckendetails</h2>
+        <p class="tour-description">Tour vom {{ formatDate(tour?.date) }} • {{ formatDistance(tour?.distance_km) }}</p>
         <!-- Add a debug element to verify rendering -->
         <div id="map-debug" style="padding: 5px; background-color: #f8f8f8; border: 1px solid #ddd; margin-bottom: 10px;">
           Map container rendered at {{ new Date().toISOString() }}
@@ -77,11 +79,15 @@ const tourMapElement = ref(null) Tour-Details...</p>
           <div class="map-legend">
             <div class="legend-item">
               <div class="legend-color" style="background-color: #3388ff; height: 5px;"></div>
-              <span>Aktuelle Tour</span>
+              <span>Tour: {{ tour?.name }}</span>
             </div>
             <div class="legend-item">
-              <div class="legend-color" style="background-color: #888888; height: 2px;"></div>
-              <span>Andere Touren</span>
+              <div class="legend-color" style="background-color: #00CC00; height: 5px; border-radius: 50%;"></div>
+              <span>Start</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: #FF0000; height: 5px; border-radius: 50%;"></div>
+              <span>Ende</span>
             </div>
           </div>
         </div>
@@ -361,16 +367,42 @@ const initMap = async () => {
       parentElement: mapDiv.parentElement ? mapDiv.parentElement.tagName : 'none'
     })
     
-    // Create a fresh map instance - use the element directly instead of the ID
+    // Create a fresh map instance with enhanced options
     map.value = L.map(mapDiv, {
-      zoomControl: true,
-      attributionControl: true
+      zoomControl: false,  // We'll add custom zoom control
+      attributionControl: true,
+      maxZoom: 18,
+      scrollWheelZoom: true,
+      doubleClickZoom: true
     })
     
-    // Add tile layer
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Add custom positioned zoom control
+    L.control.zoom({
+      position: 'topright'
+    }).addTo(map.value);
+    
+    // Add scale control
+    L.control.scale({
+      imperial: false,
+      position: 'bottomleft'
+    }).addTo(map.value);
+    
+    // Add primary tile layer (OpenStreetMap)
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map.value)
+    
+    // Add optional satellite layer for switching
+    const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    });
+    
+    // Add layer control
+    const baseLayers = {
+      "Karte": osmLayer,
+      "Satellit": satelliteLayer
+    };
+    L.control.layers(baseLayers, {}, {position: 'topright'}).addTo(map.value);
     
     console.log('Map created successfully')
   } catch (error) {
@@ -380,62 +412,9 @@ const initMap = async () => {
   }
 
   let currentTourLayer = null
-  let allToursLayer = null
-
-  // First, load all other tours to display as background
-  try {
-    console.log('Loading all tours GeoJSON data')
-    const response = await tourApi.getToursGeoJSON()
-    const allToursGeoJSON = response.data
-    
-    // Add all tours layer with gray styling
-    allToursLayer = L.geoJSON(allToursGeoJSON, {
-      style: (feature) => {
-        // Style differently if it's the current tour
-        if (feature.properties.id === tour.value.id) {
-          return {
-            color: '#3388ff',
-            weight: 5,
-            opacity: 0.8
-          }
-        }
-        // Style for all other tours
-        return {
-          color: '#888888',
-          weight: 2,
-          opacity: 0.5
-        }
-      },
-      onEachFeature: (feature, layer) => {
-        // Add hover effect for other tours
-        if (feature.properties.id !== tour.value.id) {
-          layer.on({
-            mouseover: (e) => {
-              e.target.setStyle({
-                weight: 3,
-                opacity: 0.7,
-                color: '#aaaaaa'
-              })
-            },
-            mouseout: (e) => {
-              allToursLayer.resetStyle(e.target)
-            },
-            click: (e) => {
-              // Navigate to the clicked tour
-              if (feature.properties.id !== tour.value.id) {
-                router.push(`/tours/${feature.properties.id}`)
-              }
-            }
-          })
-        }
-      }
-    }).addTo(map.value)
-    
-    console.log('Added all tours layer to map')
-  } catch (error) {
-    console.error('Error loading all tours GeoJSON:', error)
-    // Continue with just the current tour
-  }
+  
+  // We'll only show the current tour on the map
+  console.log('Rendering only the current tour on the map')
 
   // Now add the current tour track to map with prominent styling
   try {
@@ -468,12 +447,14 @@ const initMap = async () => {
       geometry: trackData
     }
     
-    // Add current tour with prominent styling
+    // Add current tour with more prominent styling
     currentTourLayer = L.geoJSON(geoJsonFeature, {
       style: {
         color: '#3388ff',
-        weight: 5,
-        opacity: 0.8
+        weight: 6,
+        opacity: 0.9,
+        lineJoin: 'round',
+        lineCap: 'round'
       }
     }).addTo(map.value)
 
@@ -495,23 +476,36 @@ const initMap = async () => {
       const startCoords = trackData.coordinates[0];
       const endCoords = trackData.coordinates[trackData.coordinates.length - 1];
       
-      // Start marker (green circle)
+      // Start marker (green flag)
       L.marker([startCoords[1], startCoords[0]], {
         icon: L.divIcon({
-          html: '<div style="display:flex;align-items:center;justify-content:center;background:#ffffff;border-radius:50%;width:30px;height:30px;box-shadow:0 1px 3px rgba(0,0,0,0.3);"><span style="font-size:16px;">�</span></div>',
-          iconSize: [30, 30],
+          html: '<div style="display:flex;align-items:center;justify-content:center;background:#ffffff;border-radius:50%;width:40px;height:40px;box-shadow:0 2px 5px rgba(0,0,0,0.4);"><span style="font-size:24px;">🚩</span></div>',
+          iconSize: [40, 40],
           className: 'start-marker-icon'
-        })
+        }),
+        title: 'Start der Tour: ' + tour.value.name
       }).addTo(map.value);
       
-      // End marker (red circle)
+      // Add a popup with tour info at start point
+      L.popup()
+        .setLatLng([startCoords[1], startCoords[0]])
+        .setContent(`
+          <div class="tour-popup">
+            <h4>${tour.value.name}</h4>
+            <p>Distanz: ${(tour.value.distance_km).toFixed(1)} km</p>
+            <p>Datum: ${new Date(tour.value.date).toLocaleDateString()}</p>
+          </div>
+        `)
+        .addTo(map.value);
+      
+      // End marker (checkered flag)
       L.marker([endCoords[1], endCoords[0]], {
         icon: L.divIcon({
-          html: '<div style="display:flex;align-items:center;justify-content:center;background:#ffffff;border-radius:50%;width:30px;height:30px;box-shadow:0 1px 3px rgba(0,0,0,0.3);"><span style="font-size:20px;">🔴</span></div>',
-          iconSize: [30, 30],
+          html: '<div style="display:flex;align-items:center;justify-content:center;background:#ffffff;border-radius:50%;width:40px;height:40px;box-shadow:0 2px 5px rgba(0,0,0,0.4);"><span style="font-size:24px;">🏁</span></div>',
+          iconSize: [40, 40],
           className: 'end-marker-icon'
         }),
-        title: 'Ende der Tour'
+        title: 'Ende der Tour: ' + tour.value.name
       }).addTo(map.value);
     }
   } catch (error) {
@@ -680,19 +674,26 @@ watch(() => tour.value?.id, async (newVal, oldVal) => {
   margin-bottom: 2rem;
 }
 
+.tour-description {
+  margin-top: -0.5rem;
+  margin-bottom: 1rem;
+  color: #666;
+  font-size: 0.9rem;
+}
+
 .map-wrapper {
   position: relative;
-  height: 400px;
+  height: 500px; /* Increased height for better visibility */
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  margin-bottom: 1rem;
 }
 
 .tour-map {
-  height: 400px !important;
+  height: 500px !important; /* Match the map-wrapper height */
   width: 100% !important;
   z-index: 1;
-  height: 100%;
 }
 
 .no-map-data {
@@ -704,20 +705,44 @@ watch(() => tour.value?.id, async (newVal, oldVal) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: rgba(245, 245, 245, 0.8);
-  font-size: 1.1rem;
-  color: #666;
+  background-color: rgba(245, 245, 245, 0.9);
+  font-size: 1.2rem;
+  color: #555;
+  border: 2px dashed #ccc;
 }
 
 .map-legend {
   position: absolute;
-  bottom: 10px;
-  right: 10px;
-  background-color: rgba(255, 255, 255, 0.8);
-  border-radius: 4px;
-  padding: 8px 12px;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
+  bottom: 20px;
+  right: 20px;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  padding: 10px 15px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   z-index: 1000;
+  font-size: 0.9rem;
+  border: 1px solid #eee;
+}
+
+/* Style for leaflet popups */
+:deep(.leaflet-popup-content) {
+  margin: 10px;
+}
+
+:deep(.tour-popup) {
+  min-width: 150px;
+}
+
+:deep(.tour-popup h4) {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+:deep(.tour-popup p) {
+  margin: 4px 0;
+  font-size: 12px;
 }
 
 .legend-item {
