@@ -63,19 +63,27 @@ const tourMapElement = ref(null) Tour-Details...</p>
         <div id="map-debug" style="padding: 5px; background-color: #f8f8f8; border: 1px solid #ddd; margin-bottom: 10px;">
           Map container rendered at {{ new Date().toISOString() }}
         </div>
-        <div class="map-wrapper">
-          <!-- Always render map container with explicit ID and key for proper rerendering -->
+        <!-- Map container with all elements together in a single wrapper -->
+        <div 
+          id="tour-map-wrapper" 
+          class="tour-map-wrapper"
+          style="position: relative; height: 500px; width: 100%; margin-bottom: 1rem;"
+        >
+          <!-- The actual map container -->
           <div 
             id="tour-map" 
             ref="tourMapElement" 
             :key="`tour-map-${tour?.id || 'default'}`"
             class="tour-map" 
-            style="height: 400px; width: 100%; border: 2px solid #ccc;"
+            style="height: 100%; width: 100%; border: 2px solid #ccc; border-radius: 8px; overflow: hidden;"
           ></div>
+          
           <!-- Show message as overlay if no data -->
           <div v-if="tour && !tour.track_geojson" class="no-map-data">
             Keine Geodaten für diese Tour verfügbar
           </div>
+          
+          <!-- Map legend as a direct child of the wrapper -->
           <div class="map-legend">
             <div class="legend-item">
               <div class="legend-color" style="background-color: #3388ff; height: 5px;"></div>
@@ -209,12 +217,19 @@ watch(
   () => tour.value,
   async (newTour) => {
     if (newTour?.track_geojson) {
-      // Give DOM time to update
+      // Give DOM time to update - need longer timeout for production environment
       await nextTick()
+      
+      // Determine if we're in production mode
+      const isProd = process.env.NODE_ENV === 'production';
+      const timeout = isProd ? 1000 : 500; // Longer timeout in production
+      
+      console.log(`Waiting ${timeout}ms for DOM update in ${isProd ? 'production' : 'development'} mode`);
+      
       setTimeout(async () => {
-        console.log('Tour data changed, reinitializing map')
-        await initMap()
-      }, 500)
+        console.log('Tour data changed, reinitializing map');
+        await initMap();
+      }, timeout);
     }
   }
 )
@@ -275,6 +290,21 @@ const loadTourData = async () => {
   }
 }
 
+// Helper function to ensure map elements are available in DOM
+const ensureMapElements = () => {
+  console.log('Checking for map elements in the DOM...');
+  const mapWrapper = document.getElementById('tour-map-wrapper');
+  const mapContainer = document.getElementById('tour-map');
+  
+  if (!mapWrapper || !mapContainer) {
+    console.log('Map elements not found, will retry...');
+    return false;
+  }
+  
+  console.log('Map elements found in the DOM');
+  return true;
+}
+
 // Load nearby tours based on start location
 const loadNearbyTours = async () => {
   try {
@@ -309,50 +339,113 @@ const initMap = async () => {
   // Wait for the component to render completely
   await nextTick()
   
-  // More robust approach to getting the map container
+  // More robust approach to getting or creating the map container
   let mapDiv = null;
+  const mapWrapperID = 'tour-map-wrapper';
+  const mapContainerID = 'tour-map';
   
   try {
-    // Try using the ref if available (using optional chaining to avoid errors)
+    // Try multiple approaches to find the map container
+    
+    // First approach: use Vue ref (most reliable in Vue components)
     if (tourMapElement?.value) {
-      console.log('Found map container via tourMapElement ref')
+      console.log('✅ Found map container via tourMapElement ref')
       mapDiv = tourMapElement.value;
     } 
-    // Next try by ID
-    else if (document.getElementById('tour-map')) {
-      console.log('Found map container via getElementById')
-      mapDiv = document.getElementById('tour-map');
+    // Second approach: get by ID
+    else if (document.getElementById(mapContainerID)) {
+      console.log('✅ Found map container via getElementById')
+      mapDiv = document.getElementById(mapContainerID);
     } 
-    // Try another selector as fallback
+    // Third approach: query selector with multiple options for better Docker Swarm compatibility
     else {
-      console.log('Trying alternative selector for map container')
-      mapDiv = document.querySelector('.tour-map');
+      console.log('Trying query selectors for map container...')
+      // Try multiple selectors to maximize chance of finding the container in different environments
+      const selectors = [
+        `#${mapContainerID}`, 
+        `.tour-map`, 
+        `div[id="${mapContainerID}"]`,
+        `[id="${mapContainerID}"]`
+      ];
       
-      if (!mapDiv) {
-        console.error('Map container not found, creating fallback container')
-        // Create a fallback container as a last resort
-        const mapWrapper = document.querySelector('.map-wrapper')
-        if (mapWrapper) {
-          mapDiv = document.createElement('div')
-          mapDiv.id = 'tour-map'
-          mapDiv.className = 'tour-map'
-          mapDiv.style.height = '400px'
-          mapDiv.style.width = '100%'
-          mapWrapper.appendChild(mapDiv)
-          console.log('Created fallback map container')
-        } else {
-          console.error('Map wrapper not found')
-          toastStore.error('Karte kann nicht angezeigt werden')
-          return
+      for (const selector of selectors) {
+        mapDiv = document.querySelector(selector);
+        if (mapDiv) {
+          console.log(`✅ Found map container via selector: ${selector}`);
+          break;
         }
       }
     }
     
+    // If we still don't have a container, create one
     if (!mapDiv) {
-      throw new Error('Map container not available after all attempts');
+      console.log('🔨 Creating a new map container...');
+      
+      // Find the parent where we should insert the map
+      let parentElement = null;
+      
+      // Try different possible parent elements
+      const possibleParents = [
+        document.getElementById(mapWrapperID),
+        document.querySelector('.tour-map-wrapper'),
+        document.querySelector('.tour-map-container'), 
+        document.getElementById('map'),
+        document.querySelector('section')
+      ];
+      
+      for (const parent of possibleParents) {
+        if (parent) {
+          parentElement = parent;
+          console.log(`✅ Found parent element: ${parent.tagName}#${parent.id || 'no-id'}`);
+          break;
+        }
+      }
+      
+      if (!parentElement) {
+        // Last resort: use the main content div
+        parentElement = document.querySelector('.tour-content') || document.body;
+        console.log('⚠️ Using fallback parent element');
+      }
+      
+      // Create new map container with Docker Swarm-friendly approach
+      mapDiv = document.createElement('div');
+      mapDiv.id = mapContainerID;
+      mapDiv.className = 'tour-map';
+      mapDiv.style.cssText = 'height: 500px; width: 100%; border: 2px solid #ccc; position: relative; z-index: 1;';
+      mapDiv.setAttribute('data-tour-id', tour.value?.id || 'default');
+      
+      // Empty the parent first to avoid multiple map containers
+      if (parentElement.querySelector('.tour-map')) {
+        console.log('⚠️ Found existing map elements, cleaning up first');
+        const existingElements = parentElement.querySelectorAll('.tour-map');
+        existingElements.forEach(el => el.remove());
+      }
+      
+      // Add to the DOM
+      parentElement.appendChild(mapDiv);
+      console.log('✅ Created and appended new map container');
+      
+      // Force a small delay to ensure DOM is updated
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    // Additional verification and debugging
+    console.log('🔍 Map container details:', {
+      id: mapDiv.id,
+      className: mapDiv.className,
+      isConnected: mapDiv.isConnected,
+      parentElement: mapDiv.parentElement ? mapDiv.parentElement.tagName : 'none',
+      clientWidth: mapDiv.clientWidth,
+      clientHeight: mapDiv.clientHeight
+    });
+    
+    if (!mapDiv.clientWidth || !mapDiv.clientHeight) {
+      console.warn('⚠️ Map container has zero width/height - forcing dimensions');
+      mapDiv.style.width = '100%';
+      mapDiv.style.height = '500px';
     }
   } catch (error) {
-    console.error('Error finding map container:', error);
+    console.error('❌ Error finding/creating map container:', error);
     toastStore.error('Fehler beim Laden der Karte: Container nicht gefunden');
     return;
   }
@@ -368,13 +461,40 @@ const initMap = async () => {
     })
     
     // Create a fresh map instance with enhanced options
-    map.value = L.map(mapDiv, {
-      zoomControl: false,  // We'll add custom zoom control
-      attributionControl: true,
-      maxZoom: 18,
-      scrollWheelZoom: true,
-      doubleClickZoom: true
-    })
+    try {
+      map.value = L.map(mapDiv, {
+        zoomControl: false,  // We'll add custom zoom control
+        attributionControl: true,
+        maxZoom: 18,
+        scrollWheelZoom: true,
+        doubleClickZoom: true,
+        fadeAnimation: false, // Disable animations in Docker Swarm for better compatibility
+        markerZoomAnimation: false,
+        preferCanvas: true // Better performance in Docker Swarm
+      });
+    } catch (mapCreationError) {
+      console.error('Error creating Leaflet map:', mapCreationError);
+      
+      // Try one more time with a clean div
+      console.log('Attempting map creation with a fresh div element...');
+      
+      const freshDiv = document.createElement('div');
+      freshDiv.id = 'tour-map-fresh';
+      freshDiv.className = 'tour-map';
+      freshDiv.style.cssText = 'height: 500px; width: 100%; border: 2px solid #ccc; position: relative; z-index: 1;';
+      
+      // Replace the old div
+      mapDiv.parentElement.replaceChild(freshDiv, mapDiv);
+      mapDiv = freshDiv;
+      
+      // Try again with the fresh div
+      map.value = L.map(mapDiv, {
+        zoomControl: false,
+        attributionControl: true,
+        maxZoom: 18,
+        preferCanvas: true
+      });
+    }
     
     // Add custom positioned zoom control
     L.control.zoom({
@@ -529,18 +649,41 @@ const scrollToMapIfNeeded = () => {
 // Lifecycle hooks
 onMounted(async () => {
   console.log('TourDetailView mounted, loading data')
+  console.log('Environment:', process.env.NODE_ENV || 'unknown');
+  
+  // Add special event listener to help with Docker Swarm environment
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOMContentLoaded event fired');
+  });
+  
   await loadTourData()
   
   // Use nextTick to ensure DOM is updated
   await nextTick()
   
+  // Docker Swarm environments may need extra time for DOM to be fully processed
+  const isProd = process.env.NODE_ENV === 'production';
+  if (isProd) {
+    console.log('Production environment detected, adding extra initialization delay');
+    await new Promise(resolve => setTimeout(resolve, 800));
+  }
+  
   // Multiple attempts with increasing timeouts to ensure map renders correctly
   // This addresses potential timing issues in different environments
-  const attemptMapInitialization = async (attempt = 1, maxAttempts = 3) => {
+  const attemptMapInitialization = async (attempt = 1, maxAttempts = 5) => { // Increased max attempts for Docker Swarm
     if (attempt > maxAttempts) {
       console.error(`Failed to initialize map after ${maxAttempts} attempts`)
       toastStore.error('Karte konnte nicht initialisiert werden')
       return
+    }
+    
+    // First check if map elements exist in DOM
+    const elementsReady = ensureMapElements();
+    if (!elementsReady && attempt < maxAttempts) {
+      console.log(`Map elements not ready, retrying (attempt ${attempt}/${maxAttempts})`);
+      const timeout = Math.pow(2, attempt - 1) * 500;
+      setTimeout(() => attemptMapInitialization(attempt + 1, maxAttempts), timeout);
+      return;
     }
     
     if (tour.value?.track_geojson) {
@@ -551,8 +694,9 @@ onMounted(async () => {
         scrollToMapIfNeeded()
       } catch (error) {
         console.warn(`Map initialization attempt ${attempt} failed:`, error)
-        // Exponential backoff for retries (500ms, 1000ms, 2000ms)
-        const timeout = Math.pow(2, attempt - 1) * 500
+        // Exponential backoff for retries with longer times for production
+        const baseTimeout = isProd ? 1000 : 500;
+        const timeout = Math.pow(2, attempt - 1) * baseTimeout
         setTimeout(() => attemptMapInitialization(attempt + 1, maxAttempts), timeout)
       }
     }
@@ -681,7 +825,7 @@ watch(() => tour.value?.id, async (newVal, oldVal) => {
   font-size: 0.9rem;
 }
 
-.map-wrapper {
+.tour-map-wrapper {
   position: relative;
   height: 500px; /* Increased height for better visibility */
   border-radius: 12px;
@@ -814,7 +958,7 @@ watch(() => tour.value?.id, async (newVal, oldVal) => {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   }
   
-  .map-wrapper {
+  .tour-map-wrapper {
     height: 300px;
   }
 }
