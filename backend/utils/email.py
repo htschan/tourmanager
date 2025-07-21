@@ -53,11 +53,17 @@ def verify_token(token: str) -> str:
         return None
 
 async def send_verification_email(email: str, token: str):
-    if not fastmail:
-        print(f"Email not configured. Verification URL for {email}: {os.getenv('FRONTEND_URL', 'http://localhost:3000')}/verify-email?token={token}")
-        return
-        
+    from utils.logger import get_logger
+    logger = get_logger(__name__)
+    
     verify_url = f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/verify-email?token={token}"
+    
+    if not fastmail:
+        logger.warning(f"Email not configured. Verification email cannot be sent to {email}")
+        logger.info(f"Verification URL for {email}: {verify_url}")
+        return
+    
+    logger.info(f"Preparing verification email for {email}")
     
     message = MessageSchema(
         subject="Verify your email",
@@ -69,6 +75,7 @@ async def send_verification_email(email: str, token: str):
                 <p>Click the link below to verify your email address:</p>
                 <p><a href="{verify_url}">Verify Email</a></p>
                 <p>This link will expire in 24 hours.</p>
+                <p>After verification, an administrator will review and approve your account.</p>
             </body>
         </html>
         """,
@@ -76,11 +83,13 @@ async def send_verification_email(email: str, token: str):
     )
     
     try:
+        logger.info(f"Sending verification email to {email}")
         await fastmail.send_message(message)
+        logger.info(f"Verification email sent successfully to {email}")
     except Exception as e:
-        print(f"Failed to send verification email to {email}: {str(e)}")
+        logger.error(f"Failed to send verification email to {email}: {str(e)}")
         # In development, print the verification URL to console
-        print(f"Verification URL: {verify_url}")
+        logger.info(f"Verification URL: {verify_url}")
 
 async def send_password_reset_email(email: str, token: str):
     if not fastmail:
@@ -105,3 +114,51 @@ async def send_password_reset_email(email: str, token: str):
         """,
         subtype="html"
     )
+    
+    try:
+        await fastmail.send_message(message)
+    except Exception as e:
+        print(f"Failed to send password reset email to {email}: {str(e)}")
+        # In development, print the reset URL to console
+        print(f"Reset URL: {reset_url}")
+
+async def send_account_approved_email(email: str):
+    """
+    Send an email to notify the user that their account has been approved by an admin.
+    
+    Args:
+        email (str): The recipient's email address
+    """
+    from utils.logger import get_logger
+    logger = get_logger(__name__)
+    
+    if not fastmail:
+        logger.info(f"Email not configured. Account approval notification for {email} could not be sent")
+        return
+    
+    login_url = f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/login"
+    
+    message = MessageSchema(
+        subject="Your Account Has Been Approved",
+        recipients=[email],
+        body=f"""
+        <html>
+            <body>
+                <h1>Account Approved</h1>
+                <p>Your account has been approved by an administrator.</p>
+                <p>You can now <a href="{login_url}">log in</a> to access the application.</p>
+                <p>Thank you for your patience.</p>
+            </body>
+        </html>
+        """,
+        subtype="html"
+    )
+    
+    try:
+        logger.info(f"Sending account approval notification to {email}")
+        await fastmail.send_message(message)
+        logger.info(f"Account approval notification sent successfully to {email}")
+    except Exception as e:
+        logger.error(f"Failed to send account approval notification to {email}: {str(e)}")
+        # In development, print the message
+        logger.info(f"Account approval notification content would have been sent to {email}")

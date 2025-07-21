@@ -1,0 +1,56 @@
+# Modified Dockerfile with direct fix for user API validation issues
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    sqlite3 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Apply the fixes directly
+RUN echo 'print("Applying fixes...")' > /app/apply_fixes.py && \
+    echo 'import re, os' >> /app/apply_fixes.py && \
+    echo 'main_file = "/app/main.py"' >> /app/apply_fixes.py && \
+    echo 'with open(main_file, "r") as f:' >> /app/apply_fixes.py && \
+    echo '    content = f.read()' >> /app/apply_fixes.py && \
+    echo 'if "from fastapi.responses import JSONResponse" not in content:' >> /app/apply_fixes.py && \
+    echo '    content = content.replace("from fastapi.responses import", "from fastapi.responses import JSONResponse,")' >> /app/apply_fixes.py && \
+    echo 'list_users_pattern = r"@app\\.get\\(\\"\/api\/users\\".*?\\)\\s*\\nasync def list_users\\("' >> /app/apply_fixes.py && \
+    echo 'match = re.search(list_users_pattern, content)' >> /app/apply_fixes.py && \
+    echo 'if match:' >> /app/apply_fixes.py && \
+    echo '    start_pos = match.start()' >> /app/apply_fixes.py && \
+    echo '    end_pattern = r"\\n@app\\."' >> /app/apply_fixes.py && \
+    echo '    rest_content = content[start_pos:]' >> /app/apply_fixes.py && \
+    echo '    end_match = re.search(end_pattern, rest_content)' >> /app/apply_fixes.py && \
+    echo '    if end_match:' >> /app/apply_fixes.py && \
+    echo '        end_pos = start_pos + end_match.start()' >> /app/apply_fixes.py && \
+    echo '        new_endpoint = """@app.get("/api/users")\\nasync def list_users(\\n    current_user: UserModel = Depends(get_current_active_user),\\n    db: Session = Depends(get_db)\\n):\\n    """List all users (admin only)"""\\n    if current_user.role != UserRole.ADMIN:\\n        raise HTTPException(\\n            status_code=403,\\n            detail="Not authorized to view user list"\\n        )\\n    \\n    users = db.query(UserModel).all()\\n    \\n    # Convert to safe dictionary format\\n    result = []\\n    for user in users:\\n        user_dict = {\\n            "username": user.username,\\n            "email": user.email,\\n            "role": str(user.role).replace("UserRole.", ""),\\n            "status": str(user.status).replace("UserStatus.", ""),\\n            "created_at": user.created_at.isoformat() if hasattr(user, "created_at") and user.created_at else None,\\n            "last_login": user.last_login.isoformat() if hasattr(user, "last_login") and user.last_login else None\\n        }\\n        result.append(user_dict)\\n    \\n    return JSONResponse(content=result)"""' >> /app/apply_fixes.py && \
+    echo '        content = content[:start_pos] + new_endpoint + content[end_pos:]' >> /app/apply_fixes.py && \
+    echo '        with open(main_file, "w") as f:' >> /app/apply_fixes.py && \
+    echo '            f.write(content)' >> /app/apply_fixes.py && \
+    echo '        print("✅ Successfully fixed list_users endpoint")' >> /app/apply_fixes.py && \
+    echo 'print("Fixes applied")' >> /app/apply_fixes.py && \
+    python /app/apply_fixes.py
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Command to run the application
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug", "--no-access-log"]

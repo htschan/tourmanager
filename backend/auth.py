@@ -90,14 +90,53 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     return user
 
 async def get_current_active_user(current_user: UserModel = Depends(get_current_user)):
+    from utils.logger import get_logger
+    logger = get_logger(__name__)
+    
+    # Admin users always bypass email verification
+    admin_username = os.getenv("ADMIN_USERNAME", "admin")
+    
+    # Check if user's email is verified (skip check for admin user)
+    if not current_user.email_verified and current_user.username != admin_username:
+        logger.warning(f"User {current_user.username} attempted to access with unverified email")
+        raise HTTPException(
+            status_code=401, 
+            detail="Email not verified. Please verify your email before accessing this resource."
+        )
+    
+    # Check if user is active (approved by admin)
     if current_user.status != UserStatus.ACTIVE:
-        raise HTTPException(status_code=400, detail="Inactive user")
+        if current_user.status == UserStatus.PENDING:
+            logger.warning(f"Pending user {current_user.username} attempted to access resources")
+            raise HTTPException(
+                status_code=401, 
+                detail="Your account is awaiting admin approval. You will be notified once approved."
+            )
+        else:
+            logger.warning(f"Inactive user {current_user.username} attempted to access resources")
+            raise HTTPException(
+                status_code=401, 
+                detail="Your account is inactive. Please contact an administrator."
+            )
+    
     return current_user
 
 def authenticate_user(db: Session, username: str, password: str):
+    from utils.logger import get_logger
+    logger = get_logger(__name__)
+    
     user = get_user(db, username)
+    
+    # Check if user exists and password is correct
     if not user or not verify_password(password, user.hashed_password):
+        logger.warning(f"Failed login attempt for username: {username}")
         return False
+    
+    # Update last login time
+    user.last_login = datetime.utcnow()
+    db.commit()
+    
+    logger.info(f"User {username} authenticated successfully")
     return user
 
 def create_initial_admin(db: Session = None):
@@ -106,8 +145,21 @@ def create_initial_admin(db: Session = None):
     Uses environment variables ADMIN_USERNAME, ADMIN_PASSWORD, and ADMIN_EMAIL.
     Falls back to default values if environment variables are not set.
     """
+    try:
+        from utils.logger import get_logger
+        logger = get_logger("admin_setup")
+    except ImportError:
+        # Fallback to basic logging if logger module is not available yet
+        import logging
+        logger = logging.getLogger("admin_setup")
+        logger.setLevel(logging.INFO)
+        handler = logging.StreamHandler()
+        logger.addHandler(handler)
+    
     if db is None:
         db = SessionLocal()
+        
+    logger.info("Checking for admin user existence")
 
     try:
         # Check if admin user already exists
@@ -125,12 +177,16 @@ def create_initial_admin(db: Session = None):
                 hashed_password=get_password_hash(admin_password),
                 role=UserRole.ADMIN,
                 status=UserStatus.ACTIVE,
+                email_verified=True,  # Admin is automatically verified
                 created_at=datetime.utcnow()
             )
+            logger.info(f"Creating initial admin user: {admin_username}")
             
             db.add(admin)
             db.commit()
             db.refresh(admin)
+            
+            logger.info(f"Initial admin user created successfully with email: {admin_email}")
             
             logger.info(f"Created initial admin user: {admin_username}")
         else:

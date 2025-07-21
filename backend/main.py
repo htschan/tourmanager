@@ -56,10 +56,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Create initial admin user on startup
+# Import database fix utility
+from utils.db_fixes import fix_user_role_case_sensitivity
+from utils.logger import get_logger
+
+# Configure logger for main module
+main_logger = get_logger(__name__)
+
+# Create initial admin user and fix database issues on startup
 @app.on_event("startup")
 async def startup_event():
     create_initial_admin()
+    
+    # Fix user role case sensitivity issues
+    try:
+        with SessionLocal() as db:
+            updated = fix_user_role_case_sensitivity(db)
+            if updated > 0:
+                main_logger.info(f"Fixed {updated} user role records with case sensitivity issues")
+    except Exception as e:
+        main_logger.error(f"Failed to fix user role case sensitivity: {str(e)}", exc_info=True)
 
 # --- Lifespan Events ---
 from contextlib import asynccontextmanager
@@ -600,84 +616,73 @@ async def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
-    # Add debug logging
-    print(f"Login attempt for user: {form_data.username}")
+    from utils.logger import get_logger
+    logger = get_logger(__name__)
     
-    # Get user from database directly to check password
-    import sqlite3
-    import os
-    from passlib.context import CryptContext
+    logger.info(f"Login attempt for user: {form_data.username}")
     
-    # Setup password context
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    # Get user from ORM
+    user = get_user(db, username=form_data.username)
     
-    # Get database path
-    if os.getenv("DOCKER_ENV") == "true":
-        db_path = "/app/data/tourmanager.db"
-    else:
-        db_path = "./tourmanager.db"
-    db_path = os.getenv("DATABASE_PATH", db_path)
-    
-    # Connect to database
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    # Check if user exists and get status
-    cursor.execute("SELECT username, hashed_password, status FROM users WHERE username = ?", (form_data.username,))
-    user_data = cursor.fetchone()
-    conn.close()
-    
-    if not user_data:
-        print(f"User {form_data.username} not found")
+    # Check if user exists
+    if not user:
+        logger.warning(f"Login failed - User not found: {form_data.username}")
         raise HTTPException(
             status_code=401,
             detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-        
-    username, stored_hash, user_status = user_data
-    
-    # Print debug info
-    print(f"Found user {username} with hash: {stored_hash} and status: {user_status}")
-    
-    # Check if user is pending approval
-    if user_status == UserStatus.PENDING.value:
-        print(f"User {form_data.username} is pending approval")
-        raise HTTPException(
-            status_code=403,
-            detail="Your account is pending approval by an administrator",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
     # Verify password
-    if not pwd_context.verify(form_data.password, stored_hash):
-        print(f"Password verification failed for {username}")
+    from auth import verify_password
+    if not verify_password(form_data.password, user.hashed_password):
+        logger.warning(f"Login failed - Incorrect password for user: {form_data.username}")
         raise HTTPException(
             status_code=401,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
-    print(f"Password verification successful for {username}")
     
-    # Get user from ORM
-    user = authenticate_user(db, form_data.username, form_data.password)
-    if not user:
-        print(f"ORM authentication failed for {username}")
+    # Check if email is verified (skip for admin)
+    admin_username = os.getenv("ADMIN_USERNAME", "admin")
+    
+    if not user.email_verified and user.username != admin_username:
+        logger.warning(f"Login blocked - Email not verified for user: {form_data.username}")
         raise HTTPException(
-            status_code=401,
-            detail="Incorrect username or password",
+            status_code=403,
+            detail="Please verify your email before logging in. Check your inbox for a verification link.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
-    )
+    
+    # Check if user is pending approval
+    if user.status == UserStatus.PENDING:
+        logger.warning(f"Login blocked - User pending admin approval: {form_data.username}")
+        raise HTTPException(
+            status_code=403,
+            detail="Your account is awaiting approval from an administrator. You will be notified when approved.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Check if user is disabled
+    if user.status == UserStatus.DISABLED:
+        logger.warning(f"Login blocked - Disabled user: {form_data.username}")
+        raise HTTPException(
+            status_code=403,
+            detail="Your account has been disabled. Please contact an administrator.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
     # Update last login time
     user.last_login = datetime.utcnow()
     db.commit()
+    
+    logger.info(f"Login successful for user: {form_data.username}")
+    
+    # Create access token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
     
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -688,8 +693,16 @@ async def read_users_me(current_user: UserModel = Depends(get_current_active_use
 @app.post("/api/auth/register", response_model=UserResponse)
 async def register_user(user: UserCreate, db: Session = Depends(get_db)):
     """Register a new user"""
+    from utils.logger import get_logger
+    from utils.email import send_verification_email
+    import secrets
+    
+    logger = get_logger(__name__)
+    logger.info(f"Registration attempt for username: {user.username}, email: {user.email}")
+    
     # Check if username already exists
     if get_user(db, username=user.username):
+        logger.warning(f"Registration failed - Username already exists: {user.username}")
         raise HTTPException(
             status_code=400,
             detail="Username already registered"
@@ -697,14 +710,42 @@ async def register_user(user: UserCreate, db: Session = Depends(get_db)):
     
     # Check if email already exists
     if get_user_by_email(db, email=user.email):
+        logger.warning(f"Registration failed - Email already exists: {user.email}")
         raise HTTPException(
             status_code=400,
             detail="Email already registered"
         )
     
-    # Create new user
-    user = create_user(db=db, user=user)
-    return user
+    # Generate verification token
+    verification_token = secrets.token_urlsafe(32)
+    
+    # Create user with PENDING status and verification token
+    hashed_password = get_password_hash(user.password)
+    db_user = UserModel(
+        username=user.username,
+        email=user.email,
+        hashed_password=hashed_password,
+        role=UserRole.USER,
+        status=UserStatus.PENDING,
+        email_verified=False,
+        verification_token=verification_token
+    )
+    
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    
+    logger.info(f"User created: {db_user.username}, status: PENDING, awaiting email verification and admin approval")
+    
+    # Send verification email
+    try:
+        await send_verification_email(db_user.email, verification_token)
+        logger.info(f"Verification email sent to {db_user.email}")
+    except Exception as e:
+        logger.error(f"Failed to send verification email: {str(e)}")
+        # We don't want to fail registration if email sending fails
+    
+    return db_user
 
 @app.get("/api/users", response_model=List[UserResponse])
 async def list_users(
@@ -717,7 +758,18 @@ async def list_users(
             status_code=403,
             detail="Not authorized to view user list"
         )
-    return db.query(UserModel).all()
+    
+    try:
+        # Use a safer query approach with error handling
+        users = db.query(UserModel).all()
+        main_logger.info(f"Successfully fetched {len(users)} users")
+        return users
+    except Exception as e:
+        main_logger.error(f"Error fetching users: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error while fetching users: {str(e)}"
+        )
 
 @app.patch("/api/users/{username}/status")
 async def update_user_status_endpoint(
@@ -1141,6 +1193,123 @@ async def upload_multiple_gpx_files(
             })
     
     return {"results": results}
+
+@app.get("/api/verify-email/{token}", response_model=UserResponse)
+async def verify_email(token: str, db: Session = Depends(get_db)):
+    """Verify a user's email address using the verification token"""
+    from utils.logger import get_logger
+    
+    logger = get_logger(__name__)
+    logger.info(f"Email verification attempt with token")
+    
+    # Find user with this verification token
+    user = db.query(UserModel).filter(UserModel.verification_token == token).first()
+    
+    if not user:
+        logger.warning(f"Invalid verification token used")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired verification token"
+        )
+    
+    # Update user's email verification status
+    user.email_verified = True
+    user.verification_token = None  # Clear the token after use
+    
+    # User is now verified but still needs admin approval
+    logger.info(f"Email verified for user {user.username}, awaiting admin approval")
+    
+    db.commit()
+    db.refresh(user)
+    
+    return user
+
+@app.post("/api/admin/approve-user/{username}", response_model=UserResponse)
+async def approve_user(
+    username: str,
+    current_user: UserModel = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Approve a pending user (admin only)"""
+    from utils.logger import get_logger
+    from utils.email import send_account_approved_email
+    
+    logger = get_logger(__name__)
+    
+    # Check if the current user is an admin
+    if current_user.role != UserRole.ADMIN:
+        logger.warning(f"Non-admin user {current_user.username} attempted to approve user {username}")
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to approve users"
+        )
+    
+    # Find the pending user
+    user = get_user(db, username)
+    if not user:
+        logger.warning(f"Attempted to approve non-existent user: {username}")
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+    
+    # Check if the user is pending
+    if user.status != UserStatus.PENDING:
+        logger.warning(f"Attempted to approve user {username} with status {user.status}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"User is not pending approval (current status: {user.status.value})"
+        )
+    
+    # Check if email is verified (skip for admin user)
+    admin_username = os.getenv("ADMIN_USERNAME", "admin")
+    
+    if not user.email_verified and user.username != admin_username:
+        logger.warning(f"Attempted to approve user {username} with unverified email")
+        raise HTTPException(
+            status_code=400,
+            detail="User's email is not verified yet"
+        )
+    
+    # Update user status to ACTIVE
+    user.status = UserStatus.ACTIVE
+    db.commit()
+    db.refresh(user)
+    
+    logger.info(f"Admin {current_user.username} approved user {username}")
+    
+    # Notify the user that their account was approved
+    try:
+        await send_account_approved_email(user.email)
+        logger.info(f"Account approval notification sent to {user.email}")
+    except Exception as e:
+        logger.error(f"Failed to send approval notification to {user.email}: {str(e)}")
+    
+    return user
+
+@app.get("/api/admin/pending-users", response_model=List[UserResponse])
+async def list_pending_users(
+    current_user: UserModel = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """List all pending users awaiting approval (admin only)"""
+    from utils.logger import get_logger
+    
+    logger = get_logger(__name__)
+    
+    # Check if the current user is an admin
+    if current_user.role != UserRole.ADMIN:
+        logger.warning(f"Non-admin user {current_user.username} attempted to access pending users")
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to view pending users"
+        )
+    
+    # Query pending users
+    pending_users = db.query(UserModel).filter(UserModel.status == UserStatus.PENDING).all()
+    logger.info(f"Admin {current_user.username} viewed list of {len(pending_users)} pending users")
+    
+    return pending_users
 
 # Protect your existing endpoints with authentication
 # Example:

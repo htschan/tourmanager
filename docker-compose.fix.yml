@@ -1,0 +1,39 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../fix/Dockerfile.fix
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./scripts:/app/scripts
+      - ./scripts:/scripts
+      - ./data:/app/data
+      - ./backend/utils:/app/utils
+    env_file:
+      - ./backend/.env
+    environment:
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-local-development-key}
+      - DOCKER_ENV=true
+      - DATABASE_PATH=/app/data/tourmanager.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3001:3000"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+networks:
+  default:
+    name: tour-manager

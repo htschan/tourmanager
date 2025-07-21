@@ -9,6 +9,7 @@ services:
       - ./scripts:/app/scripts
       - ./scripts:/scripts  # Additional mounting point for scripts
       - ./data:/app/data
+      - ./backend/utils:/app/utils  # Mount the utils directory
     env_file:
       - ./backend/.env
     # For local development, you can override the JWT secret here

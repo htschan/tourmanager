@@ -4,7 +4,19 @@ from database import Base
 import enum
 from datetime import datetime
 
-class UserRole(enum.Enum):
+class CaseInsensitiveEnum(enum.Enum):
+    """Base enum class that provides case-insensitive value comparison"""
+    
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, str):
+            # Look for a case-insensitive match
+            for member in cls:
+                if member.value.lower() == value.lower():
+                    return member
+        return None
+
+class UserRole(CaseInsensitiveEnum):
     ADMIN = "admin"
     USER = "user"
 
