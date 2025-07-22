@@ -115,4 +115,8 @@ router.beforeEach((to, from, next) => {
   next()
 })
 
+// Make router instance available globally for programmatic navigation from outside Vue components
+// This allows the API interceptor to redirect to login when token expires
+window.__VUE_ROUTER__ = router
+
 export default router

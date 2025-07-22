@@ -62,7 +62,7 @@
       <router-view />
     </main>
 
-    <!-- Toast Notifications -->
+    <!-- Toast Notifications (legacy) -->
     <div v-if="toastStore.toasts.length" class="toast-container">
       <div
         v-for="toast in toastStore.toasts"
@@ -75,6 +75,9 @@
         </button>
       </div>
     </div>
+    
+    <!-- Notification System -->
+    <NotificationsContainer />
   </div>
 </template>
 
@@ -84,16 +87,25 @@ import { useRouter } from 'vue-router'
 import { useToastStore } from './stores/toast'
 import { useThemeStore } from './stores/theme'
 import { useAuthStore } from './stores/auth'
+import { useNotificationStore } from './stores/notification'
+import NotificationsContainer from './components/NotificationsContainer.vue'
 
 const router = useRouter()
 const toastStore = useToastStore()
 const themeStore = useThemeStore()
 const authStore = useAuthStore()
+const notificationStore = useNotificationStore()
 const isMenuOpen = ref(false)
 
-onMounted(() => {
+onMounted(async () => {
   if (authStore.token) {
-    authStore.fetchUser()
+    try {
+      await authStore.fetchUser()
+    } catch (error) {
+      // If token validation fails on startup, it will be handled by the API interceptor
+      // which will redirect to login and show a notification
+      console.warn('Token validation failed on startup')
+    }
   }
 })
 
