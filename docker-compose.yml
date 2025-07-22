@@ -1,20 +1,15 @@
+version: '3.8'
+
 services:
   backend:
     build: ./backend
-    # Uncomment to use pre-built image from GitHub Container Registry
-    # image: ghcr.io/USERNAME/REPO/backend:latest
     ports:
       - "8000:8000"
     volumes:
       - ./scripts:/app/scripts
-      - ./scripts:/scripts  # Additional mounting point for scripts
       - ./data:/app/data
-      - ./backend/utils:/app/utils  # Mount the utils directory
-    env_file:
-      - ./backend/.env
-    # For local development, you can override the JWT secret here
     environment:
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-local-development-key}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-development-key}
       - DOCKER_ENV=true
       - DATABASE_PATH=/app/data/tourmanager.db
     restart: unless-stopped
@@ -22,18 +17,14 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health || exit 1"]
       interval: 5s
       timeout: 10s
-      retries: 10
-      start_period: 40s
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug", "--no-access-log"]
+      retries: 3
+      start_period: 10s
 
   frontend:
     build: ./frontend
-    # Uncomment to use pre-built image from GitHub Container Registry
-    # image: ghcr.io/USERNAME/REPO/frontend:latest
     ports:
       - "3001:3000"
     environment:
-      # Frontend runs in browser, so we need to use localhost
       - VITE_API_BASE_URL=http://localhost:8000
     depends_on:
       - backend

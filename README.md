@@ -152,20 +152,21 @@ secrets:
     name: tourm_jwt_secret
 ```
 
-## �️ Troubleshooting
+## 🔧 Troubleshooting
 
-### Email Configuration Issue
-- **Problem**: `ValidationError` when registering users with error messages about `MAIL_STARTTLS` and `MAIL_SSL_TLS`
+### Map Rendering Issues
+- **Problem**: Map container not found error in the console
 - **Solution**:
-  1. The email configuration uses outdated parameter names from an older `fastapi-mail` version
-  2. Fix by running: `./scripts/fix_email_config.sh`
-  3. This updates parameters from `MAIL_TLS/MAIL_SSL` to `MAIL_STARTTLS/MAIL_SSL_TLS`
+  1. Ensure the DOM is fully loaded using Vue's `nextTick()`
+  2. Use proper Vue refs for the map container
+  3. Increase the wait time before map initialization
 
-### Email Verification Display
-- **Problem**: No visual indication of users who haven't verified their emails
-- **Solution**: 
-  1. Run the script: `./scripts/add_email_verification_status.sh`
-  2. This adds an "Email Confirmation Pending" badge in the admin dashboard
+### Database Connection Issues
+- **Problem**: Application fails to connect to the database
+- **Solution**:
+  1. Check the `DATABASE_PATH` environment variable
+  2. Ensure the database file exists and has proper permissions
+  3. Verify the container has access to the database volume
 
 ## �🗺️ Karten-Features
 
@@ -267,7 +268,7 @@ Die Frontend-App kann als PWA auf jedem Gerät installiert werden:
 - **Mobile**: "Zum Homescreen hinzufügen"
 - **Offline-Unterstützung** für Karten und Daten
 
-## � Fehlerbehandlung & Troubleshooting
+## 🐞 Fehlerbehandlung & Troubleshooting
 
 ### Karten-Rendering Probleme
 - **Problem**: "Map container not found" Fehler in der Konsole
