@@ -161,6 +161,12 @@ secrets:
   2. Fix by running: `./scripts/fix_email_config.sh`
   3. This updates parameters from `MAIL_TLS/MAIL_SSL` to `MAIL_STARTTLS/MAIL_SSL_TLS`
 
+### Email Verification Display
+- **Problem**: No visual indication of users who haven't verified their emails
+- **Solution**: 
+  1. Run the script: `./scripts/add_email_verification_status.sh`
+  2. This adds an "Email Confirmation Pending" badge in the admin dashboard
+
 ## �🗺️ Karten-Features
 
 - **Tour-Routen Visualisierung** mit farbkodierten Linien

@@ -50,6 +50,9 @@
               <span :class="['status-badge', `status-${user.status.toLowerCase()}`]">
                 {{ user.status }}
               </span>
+              <span v-if="!user.email_verified" class="email-pending-badge">
+                Email Confirmation Pending
+              </span>
             </td>
             <td>{{ formatDate(user.created_at) }}</td>
             <td>{{ user.last_login ? formatDate(user.last_login) : 'Never' }}</td>
@@ -168,6 +171,18 @@ onMounted(refreshUsers)
   background: #f8f9fa;
   font-weight: 600;
   color: #2c3e50;
+}
+
+.email-pending-badge {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeeba;
+  border-radius: 4px;
+  font-weight: 500;
 }
 
 .role-badge,

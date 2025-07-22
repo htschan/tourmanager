@@ -37,6 +37,7 @@ class UserResponse(UserBase):
     status: UserStatus
     created_at: datetime
     last_login: Optional[datetime] = None
+    email_verified: bool = False
 
     class Config:
         from_attributes = True
