@@ -83,6 +83,12 @@ RUN cp main.py main.py.original && \
     cat main.py | sed -E 's/(def list_users[^:]+:.*?)(\n[[:space:]]+"""List all users[^"]+""".*?)(\n[[:space:]]+if.*?)$/\1\2\n    from fixed_users import bypass_users\n    return bypass_users(current_user, db, UserModel, UserRole)/g' > main.py.temp && \
     mv main.py.temp main.py
 
+# Fix email configuration parameters
+RUN if [ -f utils/email.py ]; then \
+    sed -i 's/MAIL_TLS=True/MAIL_STARTTLS=True/g' utils/email.py && \
+    sed -i 's/MAIL_SSL=False/MAIL_SSL_TLS=False/g' utils/email.py; \
+    fi
+
 # Expose port
 EXPOSE 8000
 
