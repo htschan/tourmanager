@@ -2,7 +2,7 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: ../fix/Dockerfile.fix
+      dockerfile: ../maintenance/fixes/dockerfiles/Dockerfile.allfixes
     ports:
       - "8000:8000"
     volumes:
@@ -23,12 +23,14 @@ services:
       timeout: 10s
       retries: 10
       start_period: 40s
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug", "--no-access-log"]
 
   frontend:
     build: ./frontend
     ports:
       - "3001:3000"
     environment:
+      # Frontend runs in browser, so we need to use localhost
       - VITE_API_BASE_URL=http://localhost:8000
     depends_on:
       - backend
