@@ -152,7 +152,16 @@ secrets:
     name: tourm_jwt_secret
 ```
 
-## 🗺️ Karten-Features
+## �️ Troubleshooting
+
+### Email Configuration Issue
+- **Problem**: `ValidationError` when registering users with error messages about `MAIL_STARTTLS` and `MAIL_SSL_TLS`
+- **Solution**:
+  1. The email configuration uses outdated parameter names from an older `fastapi-mail` version
+  2. Fix by running: `./scripts/fix_email_config.sh`
+  3. This updates parameters from `MAIL_TLS/MAIL_SSL` to `MAIL_STARTTLS/MAIL_SSL_TLS`
+
+## �🗺️ Karten-Features
 
 - **Tour-Routen Visualisierung** mit farbkodierten Linien
 - **Überlagerte GeoJSON-Daten** für alle Touren auf einer Karte
