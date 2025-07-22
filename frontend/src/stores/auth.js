@@ -60,10 +60,16 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     
-    logout() {
+    logout(expiredSession = false) {
       this.token = null;
       this.user = null;
       localStorage.removeItem('token');
+      
+      // If session expired, we'll add the notification message when redirecting
+      if (expiredSession) {
+        // This could be enhanced to use a toast notification system
+        console.warn('Session expired. Please login again.');
+      }
     },
     
     async register(userData) {

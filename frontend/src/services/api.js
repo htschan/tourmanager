@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { useNotificationStore } from '../stores/notification'
 
 // Base API configuration
 const API_BASE_URL = window.APP_CONFIG?.apiBaseUrl || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
@@ -36,9 +37,36 @@ api.interceptors.response.use(
   (error) => {
     // Handle common errors
     if (error.response) {
-      // Server responded with error status
-      const message = error.response.data?.detail || 'Ein Fehler ist aufgetreten'
-      error.message = message
+      // Check for token expiration (401 Unauthorized)
+      if (error.response.status === 401) {
+        // Clear token from localStorage
+        localStorage.removeItem('token')
+        
+        // Redirect to login page
+        if (window.location.pathname !== '/login') {
+          // Display notification about session expiration
+          try {
+            // Initialize notification store
+            const notificationStore = useNotificationStore()
+            notificationStore.warning('Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.', 8000)
+          } catch (e) {
+            console.warn('Could not show notification', e)
+          }
+          
+          // Use Vue Router if available in current context, or fallback to window.location
+          if (window.__VUE_ROUTER__) {
+            window.__VUE_ROUTER__.push('/login')
+          } else {
+            window.location.href = '/login'
+          }
+          
+          error.message = 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.'
+        }
+      } else {
+        // Other error responses
+        const message = error.response.data?.detail || 'Ein Fehler ist aufgetreten'
+        error.message = message
+      }
     } else if (error.request) {
       // Request was made but no response received
       error.message = 'Keine Verbindung zum Server möglich'
