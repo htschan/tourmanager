@@ -42,19 +42,8 @@ from auth import (
     change_password
 )
 
-from routers.users import create_user
+from routers.users import router as users_router, create_user
 from auth import get_user_by_email
-
-app = FastAPI()
-
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Import database fix utility
 from utils.db_fixes import fix_user_role_case_sensitivity
@@ -63,8 +52,12 @@ from utils.logger import get_logger
 # Configure logger for main module
 main_logger = get_logger(__name__)
 
-# Create initial admin user and fix database issues on startup
-@app.on_event("startup")
+# Import database fix utility
+from utils.db_fixes import fix_user_role_case_sensitivity
+from utils.logger import get_logger
+
+# Configure logger for main module
+main_logger = get_logger(__name__)
 async def startup_event():
     create_initial_admin()
     
@@ -104,6 +97,23 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# Include routers - add prefix to match expected paths
+app.include_router(users_router, prefix="/api")
+
+# Create initial admin user and fix database issues on startup
+@app.on_event("startup")
+async def startup_event():
+    create_initial_admin()
+    
+    # Fix user role case sensitivity issues
+    try:
+        with SessionLocal() as db:
+            updated = fix_user_role_case_sensitivity(db)
+            if updated > 0:
+                main_logger.info(f"Fixed {updated} user role records with case sensitivity issues")
+    except Exception as e:
+        main_logger.error(f"Failed to fix user role case sensitivity: {str(e)}", exc_info=True)
 
 # CORS Middleware für Frontend-Zugriff
 app.add_middleware(
@@ -1204,35 +1214,7 @@ async def upload_multiple_gpx_files(
     
     return {"results": results}
 
-@app.get("/api/verify-email/{token}", response_model=UserResponse)
-async def verify_email(token: str, db: Session = Depends(get_db)):
-    """Verify a user's email address using the verification token"""
-    from utils.logger import get_logger
-    
-    logger = get_logger(__name__)
-    logger.info(f"Email verification attempt with token")
-    
-    # Find user with this verification token
-    user = db.query(UserModel).filter(UserModel.verification_token == token).first()
-    
-    if not user:
-        logger.warning(f"Invalid verification token used")
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid or expired verification token"
-        )
-    
-    # Update user's email verification status
-    user.email_verified = True
-    user.verification_token = None  # Clear the token after use
-    
-    # User is now verified but still needs admin approval
-    logger.info(f"Email verified for user {user.username}, awaiting admin approval")
-    
-    db.commit()
-    db.refresh(user)
-    
-    return user
+# Endpoint moved to users.py router
 
 @app.post("/api/admin/approve-user/{username}", response_model=UserResponse)
 async def approve_user(

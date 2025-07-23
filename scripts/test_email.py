@@ -1,65 +1,44 @@
+#!/usr/bin/env python
 """
-Database fixes and utilities for handling enum value inconsistencies.
-Also includes utility functions for testing system configuration.
+Standalone script to test email configuration with Firestorm.ch
+
+Usage:
+    python test_email.py [recipient_email]
+
+If recipient_email is not provided, the test email will be sent to the MAIL_FROM address.
 """
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-from models.users import UserRole, User as UserModel
-import logging
-import os
+
 import asyncio
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+import sys
+import os
+import logging
 
-logger = logging.getLogger(__name__)
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger("email_test")
 
-def fix_user_role_case_sensitivity(db: Session):
-    """
-    Fix case sensitivity issues with UserRole enum values in the database.
-    
-    This function:
-    1. Logs current user roles to identify inconsistencies
-    2. Updates any lowercase 'user' values to 'USER' 
-    3. Updates any lowercase 'admin' values to 'ADMIN'
-    
-    Args:
-        db (Session): SQLAlchemy database session
-    
-    Returns:
-        int: Number of records updated
-    """
-    try:
-        # First, log all existing roles for debugging
-        users = db.query(UserModel).all()
-        logger.info(f"Current users in database: {len(users)}")
-        
-        for user in users:
-            logger.info(f"User {user.username}: role={user.role} (type: {type(user.role)})")
-        
-        # Count values before update
-        raw_data = db.execute(text("SELECT COUNT(*) FROM users WHERE role = 'user'")).scalar()
-        logger.info(f"Found {raw_data} users with lowercase 'user' role")
-        
-        raw_data = db.execute(text("SELECT COUNT(*) FROM users WHERE role = 'admin'")).scalar()
-        logger.info(f"Found {raw_data} users with lowercase 'admin' role")
-        
-        # Update lowercase values to uppercase
-        result1 = db.execute(text("UPDATE users SET role = 'USER' WHERE role = 'user'"))
-        result2 = db.execute(text("UPDATE users SET role = 'ADMIN' WHERE role = 'admin'"))
-        
-        db.commit()
-        
-        total_updated = result1.rowcount + result2.rowcount
-        logger.info(f"Updated {total_updated} user records to fix role case sensitivity")
-        
-        return total_updated
-        
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error fixing user roles: {str(e)}", exc_info=True)
-        raise
+# Try to load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    logger.info("Loaded environment variables from .env file")
+except ImportError:
+    logger.warning("dotenv module not found, skipping .env loading")
+    logger.info("If you need to use .env files, install python-dotenv with pip")
 
+# FastMail imports - handle gracefully if not installed
+try:
+    from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+    FASTMAIL_AVAILABLE = True
+except ImportError:
+    logger.error("fastapi_mail module not found. Please install it with pip install fastapi-mail")
+    FASTMAIL_AVAILABLE = False
 
-async def test_email_configuration(recipient_email: str = None):
+async def test_email_configuration(recipient_email=None):
     """
     Test the email configuration by sending a test email.
     Useful for verifying if the email server (like firestorm.ch) is properly configured.
@@ -72,6 +51,13 @@ async def test_email_configuration(recipient_email: str = None):
         dict: Results of the email sending attempt
     """
     logger.info("==== TESTING EMAIL CONFIGURATION ====")
+    
+    if not FASTMAIL_AVAILABLE:
+        return {
+            "success": False,
+            "error": "fastapi_mail module not installed",
+            "details": "Install with: pip install fastapi-mail"
+        }
     
     # Log all environment variables related to email
     email_vars = {
@@ -148,9 +134,13 @@ async def test_email_configuration(recipient_email: str = None):
         
         # Send test email
         logger.info(f"Sending test email to {recipient_email}...")
+        import time
+        start_time = time.time()
+        
         await fastmail.send_message(message)
         
-        success_msg = f"Test email sent successfully to {recipient_email}"
+        duration = time.time() - start_time
+        success_msg = f"Test email sent successfully to {recipient_email} (took {duration:.2f}s)"
         logger.info(success_msg)
         logger.info("==== EMAIL TEST COMPLETED SUCCESSFULLY ====")
         
@@ -158,6 +148,7 @@ async def test_email_configuration(recipient_email: str = None):
             "success": True,
             "message": success_msg,
             "recipient": recipient_email,
+            "duration_seconds": duration,
             "config": {
                 "server": os.getenv("MAIL_SERVER"),
                 "port": os.getenv("MAIL_PORT", "587"),
@@ -184,3 +175,30 @@ async def test_email_configuration(recipient_email: str = None):
                 "username": os.getenv("MAIL_USERNAME")
             }
         }
+
+async def main():
+    # Get recipient email from command line argument if provided
+    recipient_email = sys.argv[1] if len(sys.argv) > 1 else None
+    
+    print("=== Testing Email Configuration ===")
+    print(f"Recipient: {recipient_email or os.getenv('MAIL_FROM', 'Not set')}")
+    
+    # Run the test
+    result = await test_email_configuration(recipient_email)
+    
+    # Print result
+    if result['success']:
+        print("\n✅ SUCCESS! Email sent successfully!")
+        print(f"   Recipient: {result['recipient']}")
+        print(f"   Server: {result['config']['server']}:{result['config']['port']}")
+        if 'duration_seconds' in result:
+            print(f"   Time taken: {result['duration_seconds']:.2f} seconds")
+    else:
+        print("\n❌ ERROR! Failed to send email.")
+        print(f"   Error: {result.get('error', 'Unknown error')}")
+        print(f"   Server attempted: {result['config'].get('server', 'Unknown')}:{result['config'].get('port', 'Unknown')}")
+        print("\nCheck your .env file and make sure your email configuration is correct.")
+        print("If you're using Firestorm.ch, make sure you have the correct SMTP server settings.")
+
+if __name__ == "__main__":
+    asyncio.run(main())
