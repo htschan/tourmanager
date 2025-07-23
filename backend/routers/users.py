@@ -83,10 +83,20 @@ async def register_user(user: UserCreate, db: Session = Depends(get_db)):
     
     # Send verification email
     try:
-        await send_verification_email(db_user.email, db_user.verification_token)
-        logger.info(f"Verification email sent to {db_user.email}")
+        logger.info(f"Initiating verification email for new user: {user.username} ({db_user.email})")
+        email_result = await send_verification_email(db_user.email, db_user.verification_token)
+        
+        # Log the detailed result from the email function
+        if email_result and email_result.get("success"):
+            logger.info(f"Verification email successfully sent to {db_user.email}")
+            logger.info(f"Email details: took {email_result.get('duration_seconds', 'unknown')} seconds")
+        else:
+            logger.warning(f"Verification email not sent successfully to {db_user.email}")
+            if email_result:
+                logger.warning(f"Email error: {email_result.get('error', 'unknown error')}")
     except Exception as e:
         logger.error(f"Failed to send verification email to {db_user.email}: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
         # We don't want to fail registration if email sending fails
         # The admin can still manually verify users
     
