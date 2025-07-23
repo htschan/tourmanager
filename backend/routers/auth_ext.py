@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
 from auth import get_db, pwd_context, get_user_by_email, UserResponse
 from utils.email import (
     create_verification_token,
@@ -42,8 +43,40 @@ async def request_verification(
     user.verification_token = token
     db.commit()
 
-    await send_verification_email(user.email, token)
-    return {"message": "Verification email sent"}
+    # Send verification email and log the result
+    from utils.logger import get_logger
+    logger = get_logger(__name__)
+    
+    logger.info(f"Re-sending verification email for user email: {user.email}")
+    
+    try:
+        email_result = await send_verification_email(user.email, token)
+        
+        # Log detailed results
+        if email_result and email_result.get("success"):
+            logger.info(f"Verification email successfully re-sent to {user.email}")
+            logger.info(f"Email details: took {email_result.get('duration_seconds', 'unknown')} seconds")
+        else:
+            logger.warning(f"Verification email not sent successfully to {user.email}")
+            if email_result:
+                logger.warning(f"Email error: {email_result.get('error', 'unknown error')}")
+                
+        return {
+            "message": "Verification email sent",
+            "success": email_result.get("success", False) if email_result else False,
+            "details": email_result
+        }
+    except Exception as e:
+        logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        
+        # We still return success to the user, but with additional details for debugging
+        return {
+            "message": "Verification email requested, but encountered an issue",
+            "success": False,
+            "error": str(e),
+            "error_type": type(e).__name__
+        }
 
 @router.post("/verify-email")
 async def verify_email(
