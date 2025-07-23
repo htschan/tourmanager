@@ -141,10 +141,16 @@ export const useUserStore = defineStore('users', {
 
     async verifyEmail(token) {
       try {
-        await api.post('/verify-email', { token })
-        useToastStore().showSuccess('Email verified successfully')
+        console.log('UserStore.verifyEmail called with token:', token);
+        const url = `/api/verify-email/${token}`;
+        console.log('Making request to:', url);
+        const response = await api.get(url);
+        console.log('API response:', response);
+        useToastStore().success('Email verified successfully')
+        return response.data
       } catch (error) {
-        useToastStore().showError('Failed to verify email')
+        console.error('UserStore.verifyEmail error:', error);
+        useToastStore().error('Failed to verify email: ' + (error.response?.data?.detail || error.message))
         throw error
       }
     },

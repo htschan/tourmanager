@@ -8,7 +8,7 @@ from auth import (
     get_password_hash,
 )
 from models.users import User, UserRole, UserStatus
-from schemas.users import UserCreate, UserResponse, UserUpdate
+from schemas.users import UserCreate, UserResponse, UserUpdate, UserStatusUpdate
 
 router = APIRouter()
 
@@ -124,7 +124,7 @@ async def read_user_me(current_user: User = Depends(get_current_active_user)):
 @router.patch("/users/{username}/status", response_model=UserResponse)
 async def update_user_status_endpoint(
     username: str,
-    status: str,
+    status_update: UserStatusUpdate,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
@@ -135,7 +135,7 @@ async def update_user_status_endpoint(
         )
     
     try:
-        new_status = UserStatus[status.upper()]
+        new_status = UserStatus[status_update.status.upper()]
     except KeyError:
         raise HTTPException(
             status_code=400,

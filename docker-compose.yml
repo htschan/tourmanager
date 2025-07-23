@@ -12,6 +12,16 @@ services:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-development-key}
       - DOCKER_ENV=true
       - DATABASE_PATH=/app/data/tourmanager.db
+      # Email configuration for Firestorm.ch
+      - MAIL_SERVER=${MAIL_SERVER:-smtp.maildomain.ch}
+      - MAIL_PORT=${MAIL_PORT:-465}
+      - MAIL_USERNAME=${MAIL_USERNAME:-your-email@yourdomain.ch}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:-your-password}
+      - MAIL_FROM=${MAIL_FROM:-your-email@yourdomain.ch}
+      - MAIL_STARTTLS=${MAIL_STARTTLS:-True}
+      - MAIL_SSL_TLS=${MAIL_SSL_TLS:-False}
+      - USE_CREDENTIALS=${USE_CREDENTIALS:-True}
+      - FRONTEND_URL=http://localhost:3001
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health || exit 1"]

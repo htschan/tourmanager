@@ -32,6 +32,10 @@ class UserUpdate(BaseModel):
     status: Optional[str] = None
 
 
+class UserStatusUpdate(BaseModel):
+    status: str  # Accept string, will validate against UserStatus values later
+
+
 class UserResponse(UserBase):
     role: UserRole
     status: UserStatus

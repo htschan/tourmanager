@@ -2,14 +2,21 @@
   <div class="admin-container">
     <h1>User Administration</h1>
     
-    <div class="pending-users" v-if="pendingUsers.length > 0">
-      <h2>Pending Approvals</h2>
-      <div class="user-list">
+    <div class="loading-spinner" v-if="loading">
+      <div class="spinner"></div>
+      <p>Loading users...</p>
+    </div>
+    
+    <div v-else>
+      <div class="pending-users" v-if="pendingUsers.length > 0">
+        <h2>Pending Approvals</h2>
+        <div class="user-list">
         <div v-for="user in pendingUsers" :key="user.username" class="user-card">
           <div class="user-info">
             <h3>{{ user.username }}</h3>
             <p>{{ user.email }}</p>
             <p>Registered: {{ new Date(user.created_at).toLocaleDateString() }}</p>
+            <p>Email Verified: <span :class="user.email_verified ? 'verified' : 'not-verified'">{{ user.email_verified ? 'Yes' : 'No' }}</span></p>
           </div>
           <div class="user-actions">
             <button 
@@ -41,6 +48,7 @@
             <p>Status: {{ user.status }}</p>
             <p>Role: {{ user.role }}</p>
             <p>Last Login: {{ user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never' }}</p>
+            <p>Email Verified: <span :class="user.email_verified ? 'verified' : 'not-verified'">{{ user.email_verified ? 'Yes' : 'No' }}</span></p>
           </div>
           <div class="user-actions">
             <button 
@@ -70,6 +78,7 @@
           </div>
         </div>
       </div>
+    </div>
     </div>
   </div>
 </template>
@@ -259,5 +268,38 @@ button:disabled {
   padding: 20px;
   border-radius: 8px;
   margin-bottom: 30px;
+}
+
+.verified {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.not-verified {
+  color: #dc3545;
+  font-weight: bold;
+}
+
+.loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 50px 0;
+}
+
+.spinner {
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border-left-color: #42b983;
+  animation: spin 1s linear infinite;
+  margin-bottom: 15px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 </style>

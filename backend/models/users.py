@@ -55,5 +55,6 @@ class User(Base):
             "role": self.role.value,
             "status": self.status.value,
             "created_at": self.created_at.isoformat(),
-            "last_login": self.last_login.isoformat() if self.last_login else None
+            "last_login": self.last_login.isoformat() if self.last_login else None,
+            "email_verified": self.email_verified
         }

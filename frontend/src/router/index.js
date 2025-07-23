@@ -10,6 +10,7 @@ import AdminView from '../views/AdminView.vue'
 import UploadView from '../views/UploadView.vue'
 import TourDetailView from '../views/TourDetailView.vue'
 import ToursBrowseView from '../views/ToursBrowseView.vue'
+import VerifyEmail from '../views/VerifyEmail.vue'
 
 const routes = [
   {
@@ -28,6 +29,12 @@ const routes = [
     path: '/register',
     name: 'Register',
     component: RegisterView,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/verify-email',
+    name: 'VerifyEmail',
+    component: VerifyEmail,
     meta: { requiresAuth: false }
   },
   {

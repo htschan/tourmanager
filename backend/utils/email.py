@@ -22,9 +22,9 @@ def get_mail_config() -> ConnectionConfig:
     logger.info(f"  - MAIL_FROM: {os.getenv('MAIL_FROM') or '✗ Missing'}")
     logger.info(f"  - MAIL_PORT: {os.getenv('MAIL_PORT', '587 (default)')}")
     logger.info(f"  - MAIL_SERVER: {os.getenv('MAIL_SERVER', 'smtp.gmail.com (default)')}")
-    logger.info(f"  - MAIL_STARTTLS: True (hardcoded)")
-    logger.info(f"  - MAIL_SSL_TLS: False (hardcoded)")
-    logger.info(f"  - USE_CREDENTIALS: True (hardcoded)")
+    logger.info(f"  - MAIL_STARTTLS: {os.getenv('MAIL_STARTTLS', 'True')}")
+    logger.info(f"  - MAIL_SSL_TLS: {os.getenv('MAIL_SSL_TLS', 'False')}")
+    logger.info(f"  - USE_CREDENTIALS: {os.getenv('USE_CREDENTIALS', 'True')}")
     logger.info(f"  - FRONTEND_URL: {os.getenv('FRONTEND_URL', 'http://localhost:3000 (default)')}")
     
     if missing_settings:
@@ -34,15 +34,20 @@ def get_mail_config() -> ConnectionConfig:
         return None
     
     try:
+        # Convert string values to boolean for TLS settings
+        mail_starttls = os.getenv("MAIL_STARTTLS", "True").lower() in ['true', '1', 'yes', 'y']
+        mail_ssl_tls = os.getenv("MAIL_SSL_TLS", "False").lower() in ['true', '1', 'yes', 'y']
+        use_credentials = os.getenv("USE_CREDENTIALS", "True").lower() in ['true', '1', 'yes', 'y']
+        
         config = ConnectionConfig(
             MAIL_USERNAME=os.getenv("MAIL_USERNAME"),
             MAIL_PASSWORD=os.getenv("MAIL_PASSWORD"),
             MAIL_FROM=os.getenv("MAIL_FROM"),
             MAIL_PORT=int(os.getenv("MAIL_PORT", "587")),
             MAIL_SERVER=os.getenv("MAIL_SERVER", "smtp.gmail.com"),
-            MAIL_STARTTLS=True,
-            MAIL_SSL_TLS=False,
-            USE_CREDENTIALS=True
+            MAIL_STARTTLS=mail_starttls,
+            MAIL_SSL_TLS=mail_ssl_tls,
+            USE_CREDENTIALS=use_credentials
         )
         logger.info("Email configuration successfully created")
         logger.info("==== EMAIL CONFIGURATION COMPLETED ====")
@@ -115,6 +120,7 @@ async def send_verification_email(email: str, token: str):
     logger.info(f"  - MAIL_USERNAME: {os.getenv('MAIL_USERNAME', 'Not configured')}")
     
     verify_url = f"{frontend_url}/verify-email?token={token}"
+    logger.info(f"Created verification URL: {verify_url}")
     
     if not fastmail:
         logger.warning(f"Email not configured. Verification email cannot be sent to {email}")
