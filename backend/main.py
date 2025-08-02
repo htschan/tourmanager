@@ -129,9 +129,20 @@ async def log_requests(request: Request, call_next):
 app.include_router(users_router, prefix="/api", tags=["users"])
 
 # Configure CORS
+# Get allowed origins from environment or use defaults
+frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3001")
+backend_url = os.environ.get("BACKEND_URL", "http://localhost:8000")
+allowed_origins = [
+    "http://localhost:3000", 
+    "http://localhost:3001",
+    frontend_url,
+    backend_url
+]
+print(f"✅ CORS allowing origins: {allowed_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],  # Frontend URLs
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Explicitly specify methods
     allow_headers=["*"],  # Allow all headers for simplicity
