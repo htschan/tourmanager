@@ -14,6 +14,7 @@ import os
 import sys
 import logging
 import tempfile
+import traceback
 import uvicorn
 
 # Configure logging
@@ -93,39 +94,48 @@ async def lifespan(app: FastAPI):
 # FastAPI App initialisieren
 app = FastAPI(
     title="Tour Manager API",
-    description="API für die Verwaltung und Visualisierung von GPX-Touren",
+    description="API for managing GPX tours with FastAPI",
     version="1.0.0",
-    lifespan=lifespan
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
-# Include routers - add prefix to match expected paths
-app.include_router(users_router, prefix="/api")
-
-# Create initial admin user and fix database issues on startup
-@app.on_event("startup")
-async def startup_event():
-    create_initial_admin()
+# Debug middleware to log all requests
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    # Get client information
+    client_host = request.client.host if request.client else "unknown"
     
-    # Fix user role case sensitivity issues
+    # Log the request
+    logger.info(f"Request {request.method} {request.url.path} from {client_host}")
+    
+    # Log headers in debug mode
+    if logger.level <= logging.DEBUG:
+        for name, value in request.headers.items():
+            # Don't log sensitive headers like Authorization
+            if name.lower() not in ['authorization', 'cookie']:
+                logger.debug(f"Header {name}: {value}")
+    
+    # Process the request and log the response
     try:
-        with SessionLocal() as db:
-            updated = fix_user_role_case_sensitivity(db)
-            if updated > 0:
-                main_logger.info(f"Fixed {updated} user role records with case sensitivity issues")
+        response = await call_next(request)
+        logger.info(f"Response {request.method} {request.url.path}: {response.status_code}")
+        return response
     except Exception as e:
-        main_logger.error(f"Failed to fix user role case sensitivity: {str(e)}", exc_info=True)
+        logger.error(f"Request {request.method} {request.url.path} failed: {str(e)}")
+        raise
 
-# CORS Middleware für Frontend-Zugriff
+# Include the users router
+app.include_router(users_router, prefix="/api", tags=["users"])
+
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://tourm.bansom.synology.me",
-        "http://localhost:3000",  # für lokale Entwicklung
-        "http://localhost:3001",  # für lokale Entwicklung mit Vite
-    ],
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],  # Frontend URLs
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Explicitly specify methods
+    allow_headers=["*"],  # Allow all headers for simplicity
+    expose_headers=["Content-Disposition", "Content-Type"]  # Expose headers for downloads
 )
 
 # --- Konfiguration ---
@@ -194,17 +204,28 @@ def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
 def point_in_radius(tour_geojson: str, center_lat: float, center_lon: float, radius_km: float) -> bool:
     """Prüft ob eine Tour durch einen bestimmten Radius um einen Punkt führt"""
     try:
-        geojson_data = json.loads(tour_geojson)
+        if not tour_geojson:
+            return False
+            
+        # Handle case where tour_geojson is already a dictionary
+        if isinstance(tour_geojson, dict):
+            geojson_data = tour_geojson
+        else:
+            geojson_data = json.loads(tour_geojson)
+            
         coordinates = geojson_data.get('coordinates', [])
         
         # Prüfe alle Punkte der Tour
         for coord in coordinates:
-            lon, lat = coord
-            distance = calculate_distance(center_lat, center_lon, lat, lon)
-            if distance <= radius_km:
-                return True
+            # Handle different coordinate formats (some might have elevation as third value)
+            if len(coord) >= 2:
+                lon, lat = coord[0], coord[1]
+                distance = calculate_distance(center_lat, center_lon, lat, lon)
+                if distance <= radius_km:
+                    return True
         return False
-    except (json.JSONDecodeError, KeyError, IndexError):
+    except (json.JSONDecodeError, KeyError, IndexError, TypeError) as e:
+        logger.error(f"Error in point_in_radius: {str(e)}")
         return False
 
 # --- API Endpoints ---
@@ -991,40 +1012,74 @@ async def upload_gpx_file(
     db: Session = Depends(get_db)
 ):
     """
-    Upload a GPX file to add a new tour
+    Upload a GPX or KML file to add a new tour
     """
-    # Check if user is authorized
-    if current_user.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators can upload GPX files"
-        )
+    # Any authenticated user can upload files
+    # Authorization is handled by get_current_active_user dependency
     
-    # Check if the file is a GPX file
-    if not file.filename.lower().endswith('.gpx'):
+    # Import necessary modules to ensure they're available in this scope
+    import os
+    import tempfile
+    
+    # Check if the file is a GPX or KML file
+    file_ext = os.path.splitext(file.filename.lower())[1]
+    logger.debug(f"Detected file extension: '{file_ext}' for file: {file.filename}")
+    
+    if file_ext not in ['.gpx', '.kml']:
+        logger.warning(f"Rejected file with unsupported extension: {file_ext}, filename: {file.filename}")
         raise HTTPException(
             status_code=400,
-            detail="Only GPX files are accepted"
+            detail="Only GPX or KML files are accepted"
         )
     
     try:
-        # Create a temporary file to store the uploaded GPX file
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.gpx') as temp_file:
+        # Create a temporary file to store the uploaded file with correct extension
+        file_ext = os.path.splitext(file.filename.lower())[1]
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
             contents = await file.read()
             temp_file.write(contents)
             temp_file_path = temp_file.name
         
+        # If it's a KML file, convert it to GPX
+        if file_ext == '.kml':
+            try:
+                logger.info(f"Converting KML file to GPX: {file.filename}")
+                
+                # Check the file content before conversion
+                with open(temp_file_path, 'rb') as check_file:
+                    file_start = check_file.read(100)
+                    logger.debug(f"KML file content start: {file_start}")
+                
+                from utils.kml_converter import kml_to_gpx
+                gpx_path = kml_to_gpx(temp_file_path)
+                
+                if not gpx_path:
+                    logger.error(f"KML conversion failed for file: {file.filename}")
+                    return {"status": "error", "message": "Failed to convert KML file to GPX format. The KML file may be invalid or corrupted."}
+                
+                logger.info(f"KML file successfully converted to GPX: {file.filename}")
+                
+                # Clean up the original KML file
+                os.unlink(temp_file_path)
+                temp_file_path = gpx_path
+            except Exception as e:
+                logger.error(f"Exception during KML conversion: {str(e)}")
+                error_trace = traceback.format_exc()
+                logger.error(f"Traceback: {error_trace}")
+                return {"status": "error", "message": f"Error converting KML file: {str(e)}"}
+        
         # Import the GPX processing function from our script
-        import sys
-        import os
+        import sys as _sys  # Renamed to avoid conflicts
         import importlib.util
         
         # Try several possible script paths
         possible_script_paths = [
             os.path.join(os.path.dirname(os.path.abspath(__file__)), "../scripts"),  # Development environment
             "/app/scripts",  # Docker container standard path
+            "/app",  # Root of the Docker container 
             os.path.abspath("scripts"),  # Relative to current directory
             os.path.abspath("../scripts"),  # One level up
+            ".",  # Current directory
         ]
         
         # Log debugging information
@@ -1095,33 +1150,82 @@ async def upload_multiple_gpx_files(
     db: Session = Depends(get_db)
 ):
     """
-    Upload multiple GPX files at once
+    Upload multiple GPX and KML files at once
     """
-    # Check if user is authorized
-    if current_user.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators can upload GPX files"
-        )
+    # Any authenticated user can upload files
+    # Authorization is handled by get_current_active_user dependency
+    
+    # Import necessary modules to ensure they're available in this scope
+    import os
+    import tempfile
     
     results = []
     
     for file in files:
-        # Check if the file is a GPX file
-        if not file.filename.lower().endswith('.gpx'):
+        # Check if the file is a GPX or KML file
+        file_ext = os.path.splitext(file.filename.lower())[1]
+        logger.debug(f"Batch upload - Detected file extension: '{file_ext}' for file: {file.filename}")
+        
+        if file_ext not in ['.gpx', '.kml']:
+            logger.warning(f"Batch upload - Rejected file with unsupported extension: {file_ext}, filename: {file.filename}")
             results.append({
                 "filename": file.filename,
                 "status": "error",
-                "message": "Not a GPX file"
+                "message": "Only GPX and KML files are accepted"
             })
             continue
         
         try:
-            # Create a temporary file to store the uploaded GPX file
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.gpx') as temp_file:
+            # Create a temporary file to store the uploaded file with correct extension
+            file_ext = os.path.splitext(file.filename.lower())[1]
+            with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
                 contents = await file.read()
                 temp_file.write(contents)
                 temp_file_path = temp_file.name
+            
+            # If it's a KML file, convert it to GPX
+            if file_ext == '.kml':
+                try:
+                    logger.info(f"Converting KML file to GPX: {file.filename}")
+                    
+                    # Check the file content before conversion
+                    with open(temp_file_path, 'rb') as check_file:
+                        file_start = check_file.read(100)
+                        logger.debug(f"KML file content start: {file_start}")
+                    
+                    from utils.kml_converter import kml_to_gpx
+                    gpx_path = kml_to_gpx(temp_file_path)
+                    
+                    if not gpx_path:
+                        logger.error(f"KML conversion failed for file: {file.filename}")
+                        results.append({
+                            "filename": file.filename,
+                            "status": "error",
+                            "message": "Failed to convert KML file to GPX format. The KML file may be invalid or corrupted."
+                        })
+                        # Clean up the original KML file
+                        os.unlink(temp_file_path)
+                        continue
+                    
+                    logger.info(f"KML file successfully converted to GPX: {file.filename}")
+                    
+                    # Clean up the original KML file
+                    os.unlink(temp_file_path)
+                    temp_file_path = gpx_path
+                except Exception as e:
+                    logger.error(f"Exception during KML conversion: {str(e)}")
+                    error_trace = traceback.format_exc()
+                    logger.error(f"Traceback: {error_trace}")
+                    results.append({
+                        "filename": file.filename,
+                        "status": "error",
+                        "message": f"Error converting KML file: {str(e)}"
+                    })
+                    
+                    # Clean up the original KML file if it still exists
+                    if os.path.exists(temp_file_path):
+                        os.unlink(temp_file_path)
+                    continue
             
             # Import the GPX processing function from our script
             import sys
@@ -1308,6 +1412,89 @@ async def list_pending_users(
 # @app.get("/protected-route")
 # async def protected_route(current_user: User = Depends(get_current_active_user)):
 #     return {"message": "This is a protected route"}
+
+@app.post("/api/debug/upload-test")
+async def test_file_upload(file: UploadFile = File(...)):
+    """
+    Debug endpoint to test single file upload functionality
+    """
+    logger.info(f"Debug upload test received file: {file.filename}")
+    
+    try:
+        # Extract file extension
+        file_ext = os.path.splitext(file.filename.lower())[1]
+        logger.info(f"File extension: {file_ext}")
+        
+        # Get the file content
+        content = await file.read()
+        logger.info(f"File size: {len(content)} bytes")
+        logger.info(f"Content type: {file.content_type}")
+        
+        # Create a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
+            temp_file.write(content)
+            temp_file_path = temp_file.name
+            
+        logger.info(f"Wrote file to: {temp_file_path}")
+        
+        # Clean up the temporary file
+        os.unlink(temp_file_path)
+        
+        return {
+            "status": "success",
+            "filename": file.filename,
+            "size": len(content),
+            "extension": file_ext,
+            "content_type": file.content_type
+        }
+        
+    except Exception as e:
+        error_trace = traceback.format_exc()
+        logger.error(f"Debug upload error: {str(e)}")
+        logger.error(f"Traceback: {error_trace}")
+        return {
+            "status": "error",
+            "filename": file.filename,
+            "error": str(e)
+        }
+
+@app.post("/api/debug/upload-batch-test")
+async def test_batch_file_upload(files: list[UploadFile] = File(...)):
+    """
+    Debug endpoint to test batch file upload functionality
+    """
+    logger.info(f"Debug batch upload test received {len(files)} files")
+    
+    results = []
+    
+    try:
+        for i, file in enumerate(files):
+            logger.info(f"Processing file {i+1}/{len(files)}: {file.filename}")
+            
+            # Extract file extension
+            file_ext = os.path.splitext(file.filename.lower())[1]
+            
+            # Get the file content
+            content = await file.read()
+            
+            results.append({
+                "status": "success",
+                "filename": file.filename,
+                "size": len(content),
+                "extension": file_ext,
+                "content_type": file.content_type
+            })
+            
+        return {"results": results}
+        
+    except Exception as e:
+        error_trace = traceback.format_exc()
+        logger.error(f"Debug batch upload error: {str(e)}")
+        logger.error(f"Traceback: {error_trace}")
+        return {
+            "status": "error",
+            "error": str(e)
+        }
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

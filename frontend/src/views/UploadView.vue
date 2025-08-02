@@ -1,15 +1,18 @@
 <template>
   <div class="upload-page">
-    <h1>GPX Tour Upload</h1>
+    <h1>Tour Upload (GPX/KML)</h1>
     
     <div class="intro-section">
-      <p>
-        Upload your GPX tour files to add them to the database. You can drag and drop multiple files at once.
-      </p>
+      <div class="upload-notice">
+        <p>
+          Upload your GPX tour files to add them to the database. You can drag and drop multiple files at once.
+        </p>
+      </div>
+      
       <div class="tips">
         <h3>Tips</h3>
         <ul>
-          <li>Only .gpx files are accepted</li>
+          <li>GPX and KML files are accepted</li>
           <li>Maximum file size: 10MB per file</li>
           <li>Duplicate tours (same Komoot ID) will be detected automatically</li>
         </ul>
@@ -56,6 +59,7 @@
 <script setup>
 import { ref, reactive } from 'vue';
 import GpxUploader from '../components/GpxUploader.vue';
+import { useAuthStore } from '../stores/auth';
 
 const showUploadStats = ref(false);
 const uploadStats = reactive({
@@ -64,6 +68,8 @@ const uploadStats = reactive({
   warning: 0,
   error: 0
 });
+
+const authStore = useAuthStore();
 
 const handleUploadSuccess = (data) => {
   if (data.results) {
@@ -98,6 +104,17 @@ const handleUploadError = (error) => {
 h1 {
   margin-bottom: 24px;
   color: #2c3e50;
+}
+
+.upload-notice {
+  background-color: #e8f5e9;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  border-left: 4px solid #4caf50;
+}
+
+h1 {
   border-bottom: 2px solid #e0e0e0;
   padding-bottom: 12px;
 }
@@ -179,6 +196,8 @@ h1 {
   font-weight: bold;
   margin-bottom: 4px;
 }
+
+
 
 .stat-label {
   color: #777;

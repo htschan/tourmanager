@@ -113,8 +113,10 @@
 <script setup>
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
+import { useRouter } from 'vue-router'
 
-defineProps({
+const router = useRouter()
+const props = defineProps({
   tour: {
     type: Object,
     required: true
@@ -147,7 +149,7 @@ const formatDate = (dateString) => {
 
 // Navigate directly to tour detail page map section
 const navigateToMap = () => {
-  router.push(`/tour/${tour.id}#map`)
+  router.push(`/tour/${props.tour.id}#map`)
 }
 </script>
 

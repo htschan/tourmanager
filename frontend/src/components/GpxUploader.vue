@@ -1,5 +1,21 @@
 <template>
   <div class="dropzone-container">
+    <!-- Upload instructions -->
+    <div class="upload-instructions">
+      <p>Drop your GPX or KML files here.</p>
+    </div>
+    
+    <!-- File input completely separate from the dropzone -->
+    <input 
+      type="file" 
+      ref="fileInput" 
+      class="file-input" 
+      @change="onFileSelect"
+      :multiple="multiple"
+      accept=".gpx,.kml"
+      style="display: none;"
+    >
+      
     <div 
       class="dropzone" 
       :class="{ 'active': isDragging, 'error': error }"
@@ -9,26 +25,14 @@
       @drop="onDrop"
       @click="openFileDialog"
     >
-      <input 
-        type="file" 
-        ref="fileInput" 
-        class="file-input" 
-        @change="onFileSelect"
-        :multiple="multiple"
-        accept=".gpx"
-        hidden
-      >
-      
       <div v-if="!files.length" class="dropzone-placeholder">
         <div class="icon">
           <i class="fas fa-cloud-upload-alt"></i>
         </div>
         <div class="text">
-          <h3>Drop your GPX files here</h3>
-          <p>or click to browse your files</p>
+          <h3>Drop your GPX or KML files here</h3>
         </div>
-      </div>
-      
+      </div>      
       <div v-else class="file-list">
         <div 
           v-for="(file, index) in files" 
@@ -83,7 +87,7 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue';
+import { ref, reactive, computed } from 'vue';
 import axios from 'axios';
 import { api } from '../services/api';
 import { useAuthStore } from '../stores/auth';
@@ -101,6 +105,8 @@ const props = defineProps({
 
 const emit = defineEmits(['upload-success', 'upload-error']);
 
+// No longer need to check for admin role, any authenticated user can upload
+
 const fileInput = ref(null);
 const isDragging = ref(false);
 const files = reactive([]);
@@ -111,28 +117,44 @@ const uploadResults = ref([]);
 const authStore = useAuthStore();
 
 const onDragEnter = () => {
+  console.log('onDragEnter event triggered');
   isDragging.value = true;
   error.value = '';
 };
 
 const onDragLeave = () => {
+  console.log('onDragLeave event triggered');
   isDragging.value = false;
 };
 
 const onDrop = (e) => {
+  console.log('onDrop event triggered');
   e.preventDefault();
   isDragging.value = false;
   error.value = '';
   
   const droppedFiles = Array.from(e.dataTransfer.files);
+  console.log(`Dropped ${droppedFiles.length} files:`, droppedFiles);
   
-  // Filter for only GPX files
+  // Filter for GPX and KML files
   const validFiles = droppedFiles.filter(file => {
-    const isGpx = file.name.toLowerCase().endsWith('.gpx');
-    if (!isGpx) {
-      error.value = 'Only GPX files are accepted';
+    const fileName = file.name.toLowerCase();
+    console.log(`Checking file: ${fileName}, type: ${file.type}`);
+    
+    // Accept by extension and optionally by MIME type
+    const validExtension = fileName.endsWith('.gpx') || fileName.endsWith('.kml');
+    const validMimeType = file.type === 'application/gpx+xml' || 
+                         file.type === 'application/vnd.google-earth.kml+xml' ||
+                         file.type === 'application/xml' ||
+                         file.type === 'text/xml';
+    
+    const isValid = validExtension || validMimeType;
+    
+    if (!isValid) {
+      console.warn(`Rejected file: ${fileName}, type: ${file.type}`);
+      error.value = 'Only GPX and KML files are accepted';
     }
-    return isGpx;
+    return isValid;
   });
   
   // Check file size
@@ -154,13 +176,25 @@ const onFileSelect = (e) => {
   error.value = '';
   const selectedFiles = Array.from(e.target.files);
   
-  // Filter for only GPX files
+  // Filter for GPX and KML files
   const validFiles = selectedFiles.filter(file => {
-    const isGpx = file.name.toLowerCase().endsWith('.gpx');
-    if (!isGpx) {
-      error.value = 'Only GPX files are accepted';
+    const fileName = file.name.toLowerCase();
+    console.log(`Checking selected file: ${fileName}, type: ${file.type}`);
+    
+    // Accept by extension and optionally by MIME type
+    const validExtension = fileName.endsWith('.gpx') || fileName.endsWith('.kml');
+    const validMimeType = file.type === 'application/gpx+xml' || 
+                         file.type === 'application/vnd.google-earth.kml+xml' ||
+                         file.type === 'application/xml' ||
+                         file.type === 'text/xml';
+    
+    const isValid = validExtension || validMimeType;
+    
+    if (!isValid) {
+      console.warn(`Rejected selected file: ${fileName}, type: ${file.type}`);
+      error.value = 'Only GPX and KML files are accepted';
     }
-    return isGpx;
+    return isValid;
   });
   
   // Check file size
@@ -182,7 +216,13 @@ const onFileSelect = (e) => {
 };
 
 const openFileDialog = () => {
-  fileInput.value.click();
+  console.log('openFileDialog called', fileInput.value);
+  if (fileInput.value) {
+    console.log('Clicking file input element');
+    fileInput.value.click();
+  } else {
+    console.error('File input reference is null');
+  }
 };
 
 const removeFile = (index) => {
@@ -206,11 +246,14 @@ const uploadFiles = async () => {
   error.value = '';
   
   try {
+    console.log('Starting file upload process');
     const formData = new FormData();
     
     if (props.multiple) {
       // For batch upload
-      files.forEach(file => {
+      console.log(`Preparing to upload ${files.length} files in batch mode`);
+      files.forEach((file, index) => {
+        console.log(`Adding file ${index + 1}/${files.length} to form data: ${file.name} (${file.type}, ${file.size} bytes)`);
         formData.append('files', file);
       });
       
@@ -222,7 +265,7 @@ const uploadFiles = async () => {
         onUploadProgress: (progressEvent) => {
           uploadProgress.value = Math.round((progressEvent.loaded * 100) / progressEvent.total);
         }
-      };
+      };      
       
       const response = await api.post('/api/tours/upload/batch', formData, config);
       uploadResults.value = response.data.results || [];
@@ -255,6 +298,24 @@ const uploadFiles = async () => {
     
   } catch (err) {
     console.error('Upload error:', err);
+    
+    // Enhanced error logging
+    if (err.response) {
+      // The request was made and the server responded with a status code outside of 2xx
+      console.error('Error response from server:', {
+        status: err.response.status,
+        statusText: err.response.statusText,
+        data: err.response.data,
+        headers: err.response.headers
+      });
+    } else if (err.request) {
+      // The request was made but no response was received
+      console.error('No response received:', err.request);
+    } else {
+      // Something happened in setting up the request
+      console.error('Error setting up request:', err.message);
+    }
+    
     error.value = `Upload failed: ${err.response?.data?.detail || err.message || 'Unknown error'}`;
     emit('upload-error', err);
   } finally {
@@ -466,6 +527,39 @@ const formatFileSize = (size) => {
 }
 
 .result-filename {
+  font-weight: 500;
+}
+
+.standard-file-input-container {
+  margin: 0 auto 20px;
+  width: 100%;
+  max-width: 300px;
+  text-align: center;
+}
+
+.standard-file-input {
+  width: 100%;
+  padding: 10px;
+  border: 2px solid #4caf50;
+  border-radius: 4px;
+  background-color: white;
+  color: #333;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.upload-instructions {
+  background-color: #e3f2fd;
+  padding: 16px;
+  margin-bottom: 20px;
+  border-radius: 4px;
+  text-align: center;
+  border-left: 4px solid #2196f3;
+}
+
+.upload-instructions p {
+  margin: 0;
+  color: #333;
   font-weight: 500;
 }
 </style>

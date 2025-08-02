@@ -2,7 +2,11 @@ version: '3.8'
 
 services:
   backend:
-    build: ./backend
+    build: 
+      context: ./backend
+      args:
+        - BCRYPT_VERSION=4.0.1
+        - PASSLIB_VERSION=1.7.4
     ports:
       - "8000:8000"
     volumes:
