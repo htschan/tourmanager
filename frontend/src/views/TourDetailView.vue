@@ -13,23 +13,7 @@ const tourMapElement = ref(null) Tour-Details...</p>
     <div v-else-if="error" class="error-container">
       <h2>Fehler beim Laden der Tour</h2>
       <p>{{ error }}</p>
-      <button @click="loadTourData" class="btn btn-primary">Erneu      // Start m      // Start marker (green circle)
-      L.marker([startCoords[1], startCoords[0]], {
-        icon: L.divIcon({
-          html: '<div style="display:flex;align-items:center;justify-content:center;background:#ffffff;border-radius:50%;width:30px;height:30px;box-shadow:0 1px 3px rgba(0,0,0,0.3);"><span style="font-size:20px;">🟢</span></div>',
-          iconSize: [30, 30],
-          className: 'start-marker-icon'
-        }),
-        title: 'Start der Tour'
-      }).addTo(map.value);reen circle)
-      L.marker([startCoords[1], startCoords[0]], {
-        icon: L.divIcon({
-          html: '<div style="display:flex;align-items:center;justify-content:center;background:#ffffff;border-radius:50%;width:30px;height:30px;box-shadow:0 1px 3px rgba(0,0,0,0.3);"><span style="font-size:20px;">🟢</span></div>',
-          iconSize: [30, 30],
-          className: 'start-marker-icon'
-        }),
-        title: 'Start der Tour'
-      }).addTo(map.value);hen</button>
+      <button @click="loadTourData" class="btn btn-primary">Erneut versuchen</button>
       <router-link to="/" class="btn btn-secondary">Zurück zur Übersicht</router-link>
     </div>
 
@@ -593,40 +577,58 @@ const initMap = async () => {
     // Add start/end markers with better styling
     console.log('Adding start/end markers...');
     if (trackData.coordinates && trackData.coordinates.length >= 2) {
-      const startCoords = trackData.coordinates[0];
-      const endCoords = trackData.coordinates[trackData.coordinates.length - 1];
-      
-      // Start marker (green flag)
-      L.marker([startCoords[1], startCoords[0]], {
-        icon: L.divIcon({
-          html: '<div style="display:flex;align-items:center;justify-content:center;background:#ffffff;border-radius:50%;width:40px;height:40px;box-shadow:0 2px 5px rgba(0,0,0,0.4);"><span style="font-size:24px;">🚩</span></div>',
-          iconSize: [40, 40],
-          className: 'start-marker-icon'
-        }),
-        title: 'Start der Tour: ' + tour.value.name
-      }).addTo(map.value);
-      
-      // Add a popup with tour info at start point
-      L.popup()
-        .setLatLng([startCoords[1], startCoords[0]])
-        .setContent(`
-          <div class="tour-popup">
-            <h4>${tour.value.name}</h4>
-            <p>Distanz: ${(tour.value.distance_km).toFixed(1)} km</p>
-            <p>Datum: ${new Date(tour.value.date).toLocaleDateString()}</p>
-          </div>
-        `)
-        .addTo(map.value);
-      
-      // End marker (checkered flag)
-      L.marker([endCoords[1], endCoords[0]], {
-        icon: L.divIcon({
-          html: '<div style="display:flex;align-items:center;justify-content:center;background:#ffffff;border-radius:50%;width:40px;height:40px;box-shadow:0 2px 5px rgba(0,0,0,0.4);"><span style="font-size:24px;">🏁</span></div>',
-          iconSize: [40, 40],
-          className: 'end-marker-icon'
-        }),
-        title: 'Ende der Tour: ' + tour.value.name
-      }).addTo(map.value);
+      // Check the format of coordinates to ensure proper handling
+      try {
+        const startCoord = trackData.coordinates[0];
+        const endCoord = trackData.coordinates[trackData.coordinates.length - 1];
+        
+        // Safety check for coordinate format - need at least 2 values for lon/lat
+        if (startCoord.length >= 2 && endCoord.length >= 2) {
+          const startLon = startCoord[0];
+          const startLat = startCoord[1];
+          const endLon = endCoord[0];
+          const endLat = endCoord[1];
+          
+          console.log('Start coordinates:', startLat, startLon);
+          console.log('End coordinates:', endLat, endLon);
+          
+          // Start marker (green flag)
+          L.marker([startLat, startLon], {
+            icon: L.divIcon({
+              html: '<div style="display:flex;align-items:center;justify-content:center;background:#ffffff;border-radius:50%;width:40px;height:40px;box-shadow:0 2px 5px rgba(0,0,0,0.4);"><span style="font-size:24px;">🚩</span></div>',
+              iconSize: [40, 40],
+              className: 'start-marker-icon'
+            }),
+            title: 'Start der Tour: ' + tour.value.name
+          }).addTo(map.value);
+          
+          // Add a popup with tour info at start point
+          L.popup()
+            .setLatLng([startLat, startLon])
+            .setContent(`
+              <div class="tour-popup">
+                <h4>${tour.value.name}</h4>
+                <p>Distanz: ${(tour.value.distance_km).toFixed(1)} km</p>
+                <p>Datum: ${new Date(tour.value.date).toLocaleDateString()}</p>
+              </div>
+            `)
+            .addTo(map.value);
+          
+          // End marker (checkered flag)
+          L.marker([endLat, endLon], {
+            icon: L.divIcon({
+              html: '<div style="display:flex;align-items:center;justify-content:center;background:#ffffff;border-radius:50%;width:40px;height:40px;box-shadow:0 2px 5px rgba(0,0,0,0.4);"><span style="font-size:24px;">🏁</span></div>',
+              iconSize: [40, 40],
+              className: 'end-marker-icon'
+            }),
+            title: 'Ende der Tour: ' + tour.value.name
+          }).addTo(map.value);
+        } else {
+          console.error('Invalid coordinate format, not enough values for lat/lon:', startCoord, endCoord);
+        }
+      } catch (coordError) {
+        console.error('Error processing coordinates:', coordError);
+      }
     }
   } catch (error) {
     console.error('Error rendering current tour map:', error)
