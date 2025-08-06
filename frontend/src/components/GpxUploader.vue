@@ -2,7 +2,7 @@
   <div class="dropzone-container">
     <!-- Upload instructions -->
     <div class="upload-instructions">
-      <p>Drop your GPX or KML files here.</p>
+      <p>Drop your GPX, KML or KMZ files here.</p>
     </div>
     
     <!-- File input completely separate from the dropzone -->
@@ -12,7 +12,7 @@
       class="file-input" 
       @change="onFileSelect"
       :multiple="multiple"
-      accept=".gpx,.kml"
+      accept=".gpx,.kml,.kmz"
       style="display: none;"
     >
       
@@ -30,7 +30,7 @@
           <i class="fas fa-cloud-upload-alt"></i>
         </div>
         <div class="text">
-          <h3>Drop your GPX or KML files here</h3>
+          <h3>Drop your GPX, KML or KMZ files here</h3>
         </div>
       </div>      
       <div v-else class="file-list">
@@ -142,17 +142,20 @@ const onDrop = (e) => {
     console.log(`Checking file: ${fileName}, type: ${file.type}`);
     
     // Accept by extension and optionally by MIME type
-    const validExtension = fileName.endsWith('.gpx') || fileName.endsWith('.kml');
+    const validExtension = fileName.endsWith('.gpx') || fileName.endsWith('.kml') || fileName.endsWith('.kmz');
     const validMimeType = file.type === 'application/gpx+xml' || 
                          file.type === 'application/vnd.google-earth.kml+xml' ||
+                         file.type === 'application/vnd.google-earth.kmz' ||
+                         file.type === 'application/zip' ||
                          file.type === 'application/xml' ||
+                         file.type === 'application/octet-stream' ||
                          file.type === 'text/xml';
     
     const isValid = validExtension || validMimeType;
     
     if (!isValid) {
       console.warn(`Rejected file: ${fileName}, type: ${file.type}`);
-      error.value = 'Only GPX and KML files are accepted';
+      error.value = 'Only GPX, KML and KMZ files are accepted';
     }
     return isValid;
   });
@@ -182,17 +185,20 @@ const onFileSelect = (e) => {
     console.log(`Checking selected file: ${fileName}, type: ${file.type}`);
     
     // Accept by extension and optionally by MIME type
-    const validExtension = fileName.endsWith('.gpx') || fileName.endsWith('.kml');
+    const validExtension = fileName.endsWith('.gpx') || fileName.endsWith('.kml') || fileName.endsWith('.kmz');
     const validMimeType = file.type === 'application/gpx+xml' || 
                          file.type === 'application/vnd.google-earth.kml+xml' ||
+                         file.type === 'application/vnd.google-earth.kmz' ||
+                         file.type === 'application/zip' ||
                          file.type === 'application/xml' ||
+                         file.type === 'application/octet-stream' ||
                          file.type === 'text/xml';
     
     const isValid = validExtension || validMimeType;
     
     if (!isValid) {
       console.warn(`Rejected selected file: ${fileName}, type: ${file.type}`);
-      error.value = 'Only GPX and KML files are accepted';
+      error.value = 'Only GPX, KML and KMZ files are accepted';
     }
     return isValid;
   });
