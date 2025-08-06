@@ -1032,15 +1032,15 @@ async def upload_gpx_file(
     import os
     import tempfile
     
-    # Check if the file is a GPX or KML file
+    # Check if the file is a GPX, KML or KMZ file
     file_ext = os.path.splitext(file.filename.lower())[1]
     logger.debug(f"Detected file extension: '{file_ext}' for file: {file.filename}")
     
-    if file_ext not in ['.gpx', '.kml']:
+    if file_ext not in ['.gpx', '.kml', '.kmz']:
         logger.warning(f"Rejected file with unsupported extension: {file_ext}, filename: {file.filename}")
         raise HTTPException(
             status_code=400,
-            detail="Only GPX or KML files are accepted"
+            detail="Only GPX, KML or KMZ files are accepted"
         )
     
     try:
@@ -1051,7 +1051,7 @@ async def upload_gpx_file(
             temp_file.write(contents)
             temp_file_path = temp_file.name
         
-        # If it's a KML file, convert it to GPX
+        # If it's a KML or KMZ file, convert it to GPX
         if file_ext == '.kml':
             try:
                 logger.info(f"Converting KML file to GPX: {file.filename}")
@@ -1078,6 +1078,29 @@ async def upload_gpx_file(
                 error_trace = traceback.format_exc()
                 logger.error(f"Traceback: {error_trace}")
                 return {"status": "error", "message": f"Error converting KML file: {str(e)}"}
+        
+        # Handle KMZ files
+        elif file_ext == '.kmz':
+            try:
+                logger.info(f"Converting KMZ file to GPX: {file.filename}")
+                
+                from utils.kmz_converter import kmz_to_gpx
+                gpx_path = kmz_to_gpx(temp_file_path)
+                
+                if not gpx_path:
+                    logger.error(f"KMZ conversion failed for file: {file.filename}")
+                    return {"status": "error", "message": "Failed to convert KMZ file to GPX format. The KMZ file may be invalid or corrupted."}
+                
+                logger.info(f"KMZ file successfully converted to GPX: {file.filename}")
+                
+                # Clean up the original KMZ file
+                os.unlink(temp_file_path)
+                temp_file_path = gpx_path
+            except Exception as e:
+                logger.error(f"Exception during KMZ conversion: {str(e)}")
+                error_trace = traceback.format_exc()
+                logger.error(f"Traceback: {error_trace}")
+                return {"status": "error", "message": f"Error converting KMZ file: {str(e)}"}
         
         # Import the GPX processing function from our script
         import sys as _sys  # Renamed to avoid conflicts
@@ -1120,8 +1143,6 @@ async def upload_gpx_file(
             if path not in sys.path and os.path.exists(path):
                 sys.path.append(path)
             
-        # All potential directories were already added to sys.path in the code above
-        
         # Import module using spec
         spec = importlib.util.spec_from_file_location("import_gpx", import_gpx_path)
         import_gpx = importlib.util.module_from_spec(spec)
@@ -1177,12 +1198,12 @@ async def upload_multiple_gpx_files(
         file_ext = os.path.splitext(file.filename.lower())[1]
         logger.debug(f"Batch upload - Detected file extension: '{file_ext}' for file: {file.filename}")
         
-        if file_ext not in ['.gpx', '.kml']:
+        if file_ext not in ['.gpx', '.kml', '.kmz']:
             logger.warning(f"Batch upload - Rejected file with unsupported extension: {file_ext}, filename: {file.filename}")
             results.append({
                 "filename": file.filename,
                 "status": "error",
-                "message": "Only GPX and KML files are accepted"
+                "message": "Only GPX, KML and KMZ files are accepted"
             })
             continue
         
@@ -1234,6 +1255,45 @@ async def upload_multiple_gpx_files(
                     })
                     
                     # Clean up the original KML file if it still exists
+                    if os.path.exists(temp_file_path):
+                        os.unlink(temp_file_path)
+                    continue
+            
+            # If it's a KMZ file, convert it to GPX
+            elif file_ext == '.kmz':
+                try:
+                    logger.info(f"Converting KMZ file to GPX: {file.filename}")
+                    
+                    from utils.kmz_converter import kmz_to_gpx
+                    gpx_path = kmz_to_gpx(temp_file_path)
+                    
+                    if not gpx_path:
+                        logger.error(f"KMZ conversion failed for file: {file.filename}")
+                        results.append({
+                            "filename": file.filename,
+                            "status": "error",
+                            "message": "Failed to convert KMZ file to GPX format. The KMZ file may be invalid or corrupted."
+                        })
+                        # Clean up the original KMZ file
+                        os.unlink(temp_file_path)
+                        continue
+                    
+                    logger.info(f"KMZ file successfully converted to GPX: {file.filename}")
+                    
+                    # Clean up the original KMZ file
+                    os.unlink(temp_file_path)
+                    temp_file_path = gpx_path
+                except Exception as e:
+                    logger.error(f"Exception during KMZ conversion: {str(e)}")
+                    error_trace = traceback.format_exc()
+                    logger.error(f"Traceback: {error_trace}")
+                    results.append({
+                        "filename": file.filename,
+                        "status": "error",
+                        "message": f"Error converting KMZ file: {str(e)}"
+                    })
+                    
+                    # Clean up the original KMZ file if it still exists
                     if os.path.exists(temp_file_path):
                         os.unlink(temp_file_path)
                     continue

@@ -1,20 +1,21 @@
 <template>
   <div class="upload-page">
-    <h1>Tour Upload (GPX/KML)</h1>
+    <h1>Tour Upload (GPX/KML/KMZ)</h1>
     
     <div class="intro-section">
       <div class="upload-notice">
         <p>
-          Upload your GPX tour files to add them to the database. You can drag and drop multiple files at once.
+          Upload your tour files to add them to the database. You can drag and drop multiple files at once.
         </p>
       </div>
       
       <div class="tips">
         <h3>Tips</h3>
         <ul>
-          <li>GPX and KML files are accepted</li>
+          <li>GPX, KML and KMZ files are accepted</li>
           <li>Maximum file size: 10MB per file</li>
           <li>Duplicate tours (same Komoot ID) will be detected automatically</li>
+          <li>KMZ files will be automatically extracted and processed</li>
         </ul>
       </div>
     </div>
