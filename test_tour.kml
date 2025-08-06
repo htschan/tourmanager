@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Test Tour KMZ</name>
+    <description>A test tour for KMZ upload</description>
+    <Style id="routeStyle">
+      <LineStyle>
+        <color>ff0000ff</color>
+        <width>4</width>
+      </LineStyle>
+    </Style>
+    <Placemark>
+      <name>Test Tour Start</name>
+      <TimeStamp>
+        <when>2023-11-01T10:00:00Z</when>
+      </TimeStamp>
+      <Point>
+        <coordinates>8.5456,47.3769,0</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark>
+      <name>Test Tour Route</name>
+      <styleUrl>#routeStyle</styleUrl>
+      <LineString>
+        <tessellate>1</tessellate>
+        <coordinates>
+          8.5456,47.3769,0
+          8.5458,47.3772,10
+          8.5461,47.3775,15
+          8.5465,47.3778,20
+          8.5470,47.3780,25
+          8.5475,47.3782,30
+          8.5480,47.3785,35
+          8.5485,47.3787,30
+          8.5490,47.3790,25
+          8.5495,47.3792,20
+          8.5500,47.3795,15
+          8.5505,47.3797,10
+          8.5510,47.3800,0
+        </coordinates>
+      </LineString>
+    </Placemark>
+    <Placemark>
+      <name>Test Tour End</name>
+      <TimeStamp>
+        <when>2023-11-01T11:00:00Z</when>
+      </TimeStamp>
+      <Point>
+        <coordinates>8.5510,47.3800,0</coordinates>
+      </Point>
+    </Placemark>
+  </Document>
+</kml>
