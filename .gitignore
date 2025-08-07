@@ -11,3 +11,4 @@ data/tourmanager.db
 .env.local
 .env.development
 .env.production
+frontend/dist/
