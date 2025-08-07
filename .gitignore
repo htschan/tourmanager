@@ -11,14 +11,4 @@ data/tourmanager.db
 .env.local
 .env.development
 .env.production
-frontend/dist/browserconfig.xml
-frontend/dist/config.js
-frontend/dist/favicon.svg
-frontend/dist/index.html
-frontend/dist/manifest.webmanifest
-frontend/dist/registerSW.js
-frontend/dist/site.webmanifest
-frontend/dist/sw.js
-frontend/dist/workbox-74f2ef77.js
-frontend/dist/assets/index-BirHKoPb.css
-frontend/dist/assets/index-CxO_vmSJ.js
+frontend/dist/
