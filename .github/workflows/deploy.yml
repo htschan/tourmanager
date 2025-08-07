@@ -84,6 +84,10 @@ jobs:
         JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
         PORT=8000
         EOL
+        
+        # Create a file with the build timestamp
+        echo "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" > build_timestamp.txt
+        echo "${{ github.sha }}" > git_sha.txt
 
     - name: Build and push Backend
       uses: docker/build-push-action@v4
@@ -94,6 +98,15 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
+    - name: Modify Dockerfile for Frontend
+      run: |
+        BUILD_TIMESTAMP=$(cat build_timestamp.txt)
+        GIT_SHA=$(cat git_sha.txt)
+        
+        # Create a modified Dockerfile that includes the build timestamp and git SHA
+        sed -i "s/ARG VITE_BUILD_TIMESTAMP$/ARG VITE_BUILD_TIMESTAMP=\"${BUILD_TIMESTAMP}\"/" ./frontend/Dockerfile
+        sed -i "s/ARG VITE_GIT_SHA$/ARG VITE_GIT_SHA=\"${GIT_SHA}\"/" ./frontend/Dockerfile
+
     - name: Build and push Frontend
       uses: docker/build-push-action@v4
       with:
@@ -102,5 +115,3 @@ jobs:
         tags: ${{ secrets.REPOSITORY }}/tourmui:latest
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        build-args: |
-          VITE_API_BASE_URL=https://tourmbackend.bansom.synology.me
