@@ -98,20 +98,15 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
-    - name: Modify Dockerfile for Frontend
-      run: |
-        BUILD_TIMESTAMP=$(cat build_timestamp.txt)
-        GIT_SHA=$(cat git_sha.txt)
-        
-        # Create a modified Dockerfile that includes the build timestamp and git SHA
-        sed -i "s/ARG VITE_BUILD_TIMESTAMP$/ARG VITE_BUILD_TIMESTAMP=\"${BUILD_TIMESTAMP}\"/" ./frontend/Dockerfile
-        sed -i "s/ARG VITE_GIT_SHA$/ARG VITE_GIT_SHA=\"${GIT_SHA}\"/" ./frontend/Dockerfile
-
     - name: Build and push Frontend
       uses: docker/build-push-action@v4
       with:
         context: ./frontend
         push: true
         tags: ${{ secrets.REPOSITORY }}/tourmui:latest
+        build-args: |
+          VITE_API_BASE_URL=${{ secrets.API_BASE_URL || 'http://localhost:8000' }}
+          VITE_BUILD_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          VITE_GIT_SHA=${{ github.sha }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
