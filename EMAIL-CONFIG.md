@@ -40,10 +40,10 @@ EMAIL_FROM=noreply@yourdomain.com
 
 For production deployment:
 
-1. In your container orchestration platform (Docker Swarm, Kubernetes, etc.)
-2. Add the environment variables to your service configuration
-3. For sensitive information like passwords, use secrets management
-4. Ensure the configuration is consistent across all service replicas
+1. Add the environment variables to your production `.env` file
+2. Ensure `docker-compose.prod.yml` loads that `.env` file
+3. For sensitive information like passwords, use a secure secret store or restricted file permissions
+4. Start services with Docker Compose (for example: `docker compose -f docker-compose.prod.yml up -d`)
 
 ## Testing Email Configuration
 

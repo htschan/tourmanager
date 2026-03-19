@@ -341,7 +341,7 @@ const initMap = async () => {
       console.log('✅ Found map container via getElementById')
       mapDiv = document.getElementById(mapContainerID);
     } 
-    // Third approach: query selector with multiple options for better Docker Swarm compatibility
+    // Third approach: query selector with multiple options for better container runtime compatibility
     else {
       console.log('Trying query selectors for map container...')
       // Try multiple selectors to maximize chance of finding the container in different environments
@@ -391,7 +391,7 @@ const initMap = async () => {
         console.log('⚠️ Using fallback parent element');
       }
       
-      // Create new map container with Docker Swarm-friendly approach
+      // Create new map container with container runtime-friendly approach
       mapDiv = document.createElement('div');
       mapDiv.id = mapContainerID;
       mapDiv.className = 'tour-map';
@@ -452,9 +452,9 @@ const initMap = async () => {
         maxZoom: 18,
         scrollWheelZoom: true,
         doubleClickZoom: true,
-        fadeAnimation: false, // Disable animations in Docker Swarm for better compatibility
+        fadeAnimation: false, // Disable animations in containerized production for better compatibility
         markerZoomAnimation: false,
-        preferCanvas: true // Better performance in Docker Swarm
+        preferCanvas: true // Better performance in containerized production
       });
     } catch (mapCreationError) {
       console.error('Error creating Leaflet map:', mapCreationError);
@@ -653,7 +653,7 @@ onMounted(async () => {
   console.log('TourDetailView mounted, loading data')
   console.log('Environment:', process.env.NODE_ENV || 'unknown');
   
-  // Add special event listener to help with Docker Swarm environment
+  // Add special event listener to help with containerized production environment
   document.addEventListener('DOMContentLoaded', () => {
     console.log('DOMContentLoaded event fired');
   });
@@ -663,7 +663,7 @@ onMounted(async () => {
   // Use nextTick to ensure DOM is updated
   await nextTick()
   
-  // Docker Swarm environments may need extra time for DOM to be fully processed
+  // Containerized production environments may need extra time for DOM to be fully processed
   const isProd = process.env.NODE_ENV === 'production';
   if (isProd) {
     console.log('Production environment detected, adding extra initialization delay');
@@ -672,7 +672,7 @@ onMounted(async () => {
   
   // Multiple attempts with increasing timeouts to ensure map renders correctly
   // This addresses potential timing issues in different environments
-  const attemptMapInitialization = async (attempt = 1, maxAttempts = 5) => { // Increased max attempts for Docker Swarm
+  const attemptMapInitialization = async (attempt = 1, maxAttempts = 5) => { // Increased max attempts for containerized production
     if (attempt > maxAttempts) {
       console.error(`Failed to initialize map after ${maxAttempts} attempts`)
       toastStore.error('Karte konnte nicht initialisiert werden')

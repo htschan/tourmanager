@@ -1,8 +1,8 @@
-# Docker Swarm Deployment Notes
+# Docker Compose Runtime Notes
 
 ## Map Rendering Issues and Fixes
 
-The map rendering issues in Docker Swarm production environments have been fixed by implementing the following changes:
+The map rendering issues in Docker Compose production environments have been fixed by implementing the following changes:
 
 ### 1. CSS Consistency
 
@@ -36,23 +36,15 @@ The map rendering issues in Docker Swarm production environments have been fixed
 
 ### 5. Leaflet-Specific Optimizations
 
-- Modified Leaflet configuration for better Docker Swarm compatibility:
+- Modified Leaflet configuration for better production compatibility:
   - Disabled animations that could cause rendering issues
   - Used `preferCanvas: true` for better performance in production
   - Added additional controls (zoom, scale) at improved positions
   - Improved layer and tile loading strategies
 
-## Deployment Configuration
-
-The included files provide a complete setup for Docker Swarm deployment:
-
-- `portainer-stack.yml`: Main stack configuration for Portainer
-- `nginx.conf`: NGINX reverse proxy configuration
-- Frontend and Backend Docker image configurations
-
 ## Environment Variables
 
-Make sure to set these environment variables in your Docker Swarm environment:
+Make sure to set these environment variables in your Docker Compose environment:
 
 ```
 EMAIL_HOST=smtp.fastmail.com
@@ -65,7 +57,7 @@ CORS_ORIGIN=https://yourdomain.com
 
 ## Monitoring
 
-After deployment, monitor the browser console for any warnings or errors related to map rendering. The code now includes extensive logging to help identify issues.
+After Docker Compose deployment, monitor the browser console for any warnings or errors related to map rendering. The code now includes extensive logging to help identify issues.
 
 ## Further Improvements
 
