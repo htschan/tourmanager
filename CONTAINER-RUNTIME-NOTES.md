@@ -1,8 +1,8 @@
-# Container Runtime Notes
+# Docker Compose Runtime Notes
 
 ## Map Rendering Issues and Fixes
 
-The map rendering issues in production container environments have been fixed by implementing the following changes:
+The map rendering issues in Docker Compose production environments have been fixed by implementing the following changes:
 
 ### 1. CSS Consistency
 
@@ -44,7 +44,7 @@ The map rendering issues in production container environments have been fixed by
 
 ## Environment Variables
 
-Make sure to set these environment variables in your container environment:
+Make sure to set these environment variables in your Docker Compose environment:
 
 ```
 EMAIL_HOST=smtp.fastmail.com
@@ -57,7 +57,7 @@ CORS_ORIGIN=https://yourdomain.com
 
 ## Monitoring
 
-After deployment, monitor the browser console for any warnings or errors related to map rendering. The code now includes extensive logging to help identify issues.
+After Docker Compose deployment, monitor the browser console for any warnings or errors related to map rendering. The code now includes extensive logging to help identify issues.
 
 ## Further Improvements
 

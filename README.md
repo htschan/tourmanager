@@ -120,38 +120,6 @@ services:
       - VITE_API_BASE_URL=http://localhost:8000
 ```
 
-### Docker Stack (Production)
-```yaml
-services:
-  tourm-backend:
-    image: hub.bansom.synology.me/tourmbackend:latest
-    restart: on-failure:5
-    ports:
-      - 8000:8000
-    volumes:
-      - /volume1/docker/tourmbackend:/app/scripts
-      - /volume1/docker/tourmdata:/app/data
-    secrets:
-      - jwt_secret
-    environment:
-      - JWT_SECRET_KEY_FILE=/run/secrets/jwt_secret
-      - DATABASE_PATH=/app/data/tourmanager.db
-      - DOCKER_ENV=true
-
-  tourm-frontend:
-    image: hub.bansom.synology.me/tourmui:latest
-    restart: unless-stopped
-    ports:
-      - 3001:3000
-    environment:
-      - VITE_API_BASE_URL=https://tourmbackend.bansom.synology.me
-
-secrets:
-  jwt_secret:
-    external: true
-    name: tourm_jwt_secret
-```
-
 ## 🔧 Troubleshooting
 
 ### Map Rendering Issues
