@@ -39,7 +39,7 @@ fi
 
 # Build and start the application
 echo "🏗️ Building and starting the application..."
-docker-compose up --build -d
+docker compose up --build -d
 
 echo "✅ Setup complete!"
 echo ""
@@ -52,5 +52,5 @@ echo "🔑 Default admin credentials:"
 echo "- Username: admin"
 echo "- Password: admin"
 echo ""
-echo "To check logs: docker-compose logs -f"
-echo "To stop the application: docker-compose down"
+echo "To check logs: docker compose logs -f"
+echo "To stop the application: docker compose down"

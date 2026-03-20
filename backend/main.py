@@ -168,10 +168,9 @@ class TourBase(BaseModel):
     ebike: bool
     komootid: Optional[str] = None
     komoothref: Optional[str] = None
-    track_geojson: Optional[Any] = None  # Can be string or dict
 
 class TourDetail(TourBase):
-    pass  # Inherits all fields from TourBase, including optional track_geojson
+    track_geojson: Optional[Any] = None  # Can be string or dict
 
 class TourSummary(BaseModel):
     total_tours: int
@@ -294,7 +293,7 @@ async def get_tours(
     
     query = """
         SELECT id, name, type, date, distance_km, duration_s, speed_kmh, 
-               elevation_up, elevation_down, start_lat, start_lon, ebike, komootid, komoothref, track_geojson
+               elevation_up, elevation_down, start_lat, start_lon, ebike, komootid, komoothref
         FROM tours 
         WHERE 1=1
     """
@@ -363,8 +362,7 @@ async def get_tours(
                     start_lon=row[10],
                     ebike=bool(row[11]),
                     komootid=row[12],
-                    komoothref=row[13],
-                    track_geojson=row[14]
+                    komoothref=row[13]
                 ))
             return tours
     except Exception as e:

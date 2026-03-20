@@ -223,10 +223,10 @@ python import_gpx.py
 
 ```bash
 # Alle Services mit Docker starten
-docker-compose up -d
+docker compose up -d
 
 # Services einzeln skalieren
-docker-compose up --scale backend=2 --scale frontend=2
+docker compose up --scale backend=2 --scale frontend=2
 ```
 
 ## 📱 PWA Installation
