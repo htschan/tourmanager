@@ -48,7 +48,7 @@ mkdir -p data
 3. Build and start the application:
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 ## Production Deployment
@@ -72,7 +72,7 @@ FRONTEND_URL=https://your-domain.com
 2. Use the production Docker Compose file:
 
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 ## Using GitHub Container Registry
@@ -99,7 +99,7 @@ services:
 3. Start the application:
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 ## Environment Variables
@@ -152,13 +152,13 @@ curl http://localhost:8000/health
 View application logs:
 
 ```bash
-docker-compose logs -f
+docker compose logs -f
 ```
 
 To view logs for a specific service:
 
 ```bash
-docker-compose logs -f backend
+docker compose logs -f backend
 # or
-docker-compose logs -f frontend
+docker compose logs -f frontend
 ```
