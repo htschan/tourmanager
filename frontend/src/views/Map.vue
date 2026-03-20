@@ -129,7 +129,7 @@ const tourStore = useTourStore()
 const toastStore = useToastStore()
 
 // Get reactive store state
-const { tours, loading, error, tourTypes, filters, filteredTours } = storeToRefs(tourStore)
+const { loading, error, tourTypes, filters } = storeToRefs(tourStore)
 
 // Local state
 const mapContainer = ref(null)
@@ -175,17 +175,6 @@ watch(
     }
   },
   { deep: true }
-)
-
-// Watch for filtered tours to change
-watch(
-  () => filteredTours.value,
-  (newTours) => {
-    if (map.value && !loadingMap.value) {
-      console.log('🗺️ Filtered tours changed, reloading map data...')
-      loadMapData()
-    }
-  }
 )
 
 // Computed
@@ -239,6 +228,24 @@ const initMap = async () => {
   }
 }
 
+const buildMapParams = () => {
+  const params = { limit: 999999 }
+
+  if (filters.value.tourType) {
+    params.tour_type = filters.value.tourType
+  }
+
+  if (filters.value.dateFrom) {
+    params.date_from = filters.value.dateFrom
+  }
+
+  if (filters.value.dateTo) {
+    params.date_to = filters.value.dateTo
+  }
+
+  return params
+}
+
 const loadMapData = async () => {
   console.log('🗺️ === LOAD MAP DATA START ===')
   
@@ -255,21 +262,15 @@ const loadMapData = async () => {
   loadingMap.value = true
   
   try {
-    // Use the filtered tours from the store
-    const currentTours = filteredTours.value || []
-    if (!currentTours.length) {
-      console.log('🗺️ No filtered tours available')
-      return
-    }
-    console.log(`🗺️ Using ${currentTours.length} filtered tours from store`)
-      // Convert store tours to GeoJSON format
-    const features = toursToFeatures(currentTours)
-    console.log(`🗺️ Converted ${features.length} tours to GeoJSON format`)
+    const geojsonData = await tourStore.fetchToursGeoJSON(buildMapParams())
+    const features = geojsonData.features || []
+    console.log(`🗺️ Loaded ${features.length} tours from GeoJSON endpoint`)
 
-    // Create GeoJSON collection
-    const geojsonData = {
-      type: "FeatureCollection",
-      features
+    if (!features.length) {
+      clearTourLayers()
+      selectedTour.value = null
+      toastStore.success('Keine Touren für die aktuellen Filter gefunden')
+      return
     }
     
     // Clear existing layers before adding new ones
@@ -331,8 +332,7 @@ const clearFilters = () => {
   tourStore.updateFilters({
     tourType: '',
     dateFrom: '',
-    dateTo: '',
-    limit: 999999
+    dateTo: ''
   })
   localStorage.removeItem(STORAGE_KEY)
   applyFilters()
@@ -356,7 +356,7 @@ const zoomToTour = (tour) => {
   }
 }
 
-const applyFilters = () => {
+const applyFilters = async () => {
   if (!map.value) {
     console.log('🗺️ Map not ready, skipping filter application')
     return
@@ -365,65 +365,12 @@ const applyFilters = () => {
   console.log('🗺️ ===== APPLY FILTERS START =====')
   console.log('🗺️ Current filters:', filters.value)
   
-  // Use the store's filtered tours
-  const currentTours = filteredTours.value || []
-  console.log(`🗺️ Using ${currentTours.length} filtered tours from store`)
-  
-  // Clear existing tour layers
-  console.log('🗺️ Clearing existing tour layers...')
-  clearTourLayers()
-  
-  // Convert filtered tours to GeoJSON using helper
-  const features = toursToFeatures(currentTours)
-  console.log(`🗺️ Filtered tours: ${filteredTours.length} tours converted to ${features.length} GeoJSON features`)
-  
   // Save filters to localStorage
   saveFilters()
-  
-  // Track bounds for later map fitting
-  const bounds = []
-  let addedLayers = 0
-  
-  // Add each tour to the map with proper error handling
-  for (const feature of features) {
-    const tour = feature.properties
-    const color = typeColors[tour.type] || typeColors['Undefined']
-    
-    try {
-      const layer = L.geoJSON(feature, {
-        style: {
-          color: color,
-          weight: 3,
-          opacity: 0.8
-        }
-      }).addTo(map.value)
-      
-      layer.on('click', () => selectTour(tour))
-      
-      layer.bindTooltip(`
-        <strong>${tour.name}</strong><br>
-        ${tour.type} • ${tour.distance_km.toFixed(1)} km<br>
-        ${formatDate(tour.date)}
-      `, { sticky: true })
-      
-      tourLayers.value.push(layer)
-      bounds.push(layer.getBounds())
-      addedLayers++
-    } catch (err) {
-      console.error(`🗺️ Error adding tour ${tour.id} to map:`, err)
-    }
-  }
-  
-  // Fit map to show all visible tours
-  if (bounds.length > 0) {
-    const allBounds = L.latLngBounds(bounds)
-    map.value.fitBounds(allBounds.pad(0.1))
-  }
-  
-  console.log(`🗺️ Successfully added ${addedLayers} layers to map`)
+
+  await loadMapData()
+
   console.log('🗺️ ===== APPLY FILTERS END =====')
-  
-  toastStore.success(`${addedLayers} gefilterte Touren angezeigt`)
 }
 
 const clearTourLayers = () => {
@@ -495,16 +442,6 @@ const formatDate = (dateString) => {
   }
 }
 
-// Convert an array of tours to GeoJSON features
-const toursToFeatures = (tours) => {
-  const features = []
-  for (const tour of tours) {
-    const feature = convertToGeoJSON(tour)
-    if (feature) features.push(feature)
-  }
-  return features
-}
-
 // Lifecycle
 onMounted(async () => {
   console.log('🗺️ ===== MAP COMPONENT MOUNTED =====')
@@ -545,34 +482,6 @@ onUnmounted(() => {
     map.value.remove()
   }
 })
-
-const convertToGeoJSON = (tour) => {
-  if (!tour.track_geojson) {
-    console.warn(`🗺️ Tour ${tour.id} has no track_geojson data`)
-    return null
-  }
-  
-  try {
-    const trackData = JSON.parse(tour.track_geojson)
-    return {
-      type: "Feature",
-      geometry: trackData,
-      properties: {
-        id: tour.id,
-        name: tour.name,
-        type: tour.type,
-        date: tour.date,
-        distance_km: tour.distance_km,
-        start_lat: tour.start_lat,
-        start_lon: tour.start_lon,
-        ebike: tour.ebike
-      }
-    }
-  } catch (err) {
-    console.warn(`🗺️ Failed to parse track_geojson for tour ${tour.id}:`, err)
-    return null
-  }
-}
 </script>
 
 <style scoped>
